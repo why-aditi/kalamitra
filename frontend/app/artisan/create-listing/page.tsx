@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition"
 
 export default function CreateListing() {
   const router = useRouter()
@@ -41,39 +42,28 @@ export default function CreateListing() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+  } = useSpeechRecognition()
 
   // Voice Recording Functions
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-
-      const chunks: BlobPart[] = []
-      mediaRecorder.ondataavailable = (event) => {
-        chunks.push(event.data)
-      }
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "audio/wav" })
-        setAudioBlob(blob)
-        transcribeAudio(blob)
-        stream.getTracks().forEach((track) => track.stop())
-      }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-    } catch (error) {
-      console.error("Error accessing microphone:", error)
-      alert("Unable to access microphone. Please check permissions.")
+  const startRecording = () => {
+    if (!browserSupportsSpeechRecognition) {
+      alert("Browser does not support speech recognition.")
+      return
     }
+    resetTranscript()
+    SpeechRecognition.startListening({ continuous: true, language: "en-IN" })
+    setIsRecording(true)
   }
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-    }
+    SpeechRecognition.stopListening()
+    setIsRecording(false)
+    setTranscription(transcript)
   }
 
   const transcribeAudio = async (blob: Blob) => {
@@ -251,30 +241,34 @@ export default function CreateListing() {
                 </div>
 
                 {/* Transcription */}
-                {(isTranscribing || transcription) && (
+                {(isTranscribing || transcription || isRecording) && (
                   <div className="space-y-4">
                     <Label>Transcription</Label>
-                    {isTranscribing ? (
+                    {isRecording ? (
+                      <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
+                        <RefreshCw className="w-4 h-4 animate-spin text-orange-500" />
+                        <span className="text-gray-600">Listening... Speak now!</span>
+                      </div>
+                    ) : isTranscribing ? (
                       <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
                         <RefreshCw className="w-4 h-4 animate-spin text-orange-500" />
                         <span className="text-gray-600">Transcribing your voice...</span>
                       </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={transcription}
-                          onChange={(e) => setTranscription(e.target.value)}
-                          rows={4}
-                          className="resize-none"
-                        />
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={startRecording}>
-                            <Mic className="w-4 h-4 mr-1" />
-                            Re-record
-                          </Button>
-                        </div>
+                    ) : null}
+                    <div className="space-y-2">
+                      <Textarea
+                        value={isRecording ? transcript : transcription}
+                        onChange={(e) => setTranscription(e.target.value)}
+                        rows={4}
+                        className="resize-none"
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={startRecording}>
+                          <Mic className="w-4 h-4 mr-1" />
+                          Re-record
+                        </Button>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
