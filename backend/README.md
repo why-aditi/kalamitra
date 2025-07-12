@@ -22,7 +22,7 @@ pip install -r req.txt
 3. Run the server:
 
 ```bash
-python main.py
+uvicorn main:app --reload
 ```
 
 The API will be available at `http://localhost:8000`
