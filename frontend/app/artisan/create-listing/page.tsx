@@ -85,7 +85,7 @@ const stopRecording = () => {
   }, [])
 
   // AI Generation
-  const generateListing = async () => {
+const generateListing = async () => {
   if (!transcription || images.length === 0) return;
 
   setIsGenerating(true);
@@ -95,7 +95,7 @@ const stopRecording = () => {
     formData.append("transcription", transcription);
     images.forEach((img, index) => formData.append(`images`, img));
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/generate-listing`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-listing`, {
       method: "POST",
       body: formData,
     });
@@ -105,8 +105,17 @@ const stopRecording = () => {
     }
 
     const data = await response.json();
-    setAiListing(data);
-    console.log("AI Listing Generated:", aiListing);
+    
+    // Fix: Extract the AI listing data from the nested response
+    setAiListing({
+      ...data.ai_listing, // This contains the actual AI generated content
+      listingId: data.listing_id, // Store the database ID
+      imageIds: data.image_ids,
+      createdAt: data.created_at
+    });
+    
+    console.log("AI Listing Generated:", data);
+    
   } catch (error) {
     console.error(error);
     alert("Error generating listing. Please try again.");
@@ -115,34 +124,37 @@ const stopRecording = () => {
   }
 };
 
-  // setAiListing({
-  //   title: "Handcrafted Rajasthani Clay Diya Set",
-  //   description:
-  //     "Exquisite handmade clay diyas crafted using traditional Rajasthani techniques passed down through generations. Each diya is carefully shaped and decorated with intricate patterns, perfect for festivals, celebrations, and home decoration. Made from natural clay sourced locally, these diyas bring warmth and traditional charm to any space.",
-  //   tags: ["Handmade", "Clay", "Diya", "Rajasthani", "Traditional", "Festival", "Home Decor"],
-  //   category: "Home & Decor",
-  //   suggestedPrice: "₹299",
-  //   story:
-  //     "Crafted in the heart of Rajasthan by skilled artisans who have been perfecting this art for generations. Each piece tells a story of tradition, culture, and the timeless beauty of Indian craftsmanship.",
-  // })
+// Update the publishListing function to handle already saved listing
+const publishListing = async () => {
+  try {
+    // If we already have a listing ID, just redirect to dashboard
+    if (aiListing?.listingId) {
+      router.push(`/artisan/dashboard?success=true&listingId=${aiListing.listingId}`);
+      return;
+    }
+    
+    // Fallback: If for some reason we don't have a listing ID, create it now
+    const formData = new FormData();
+    formData.append("transcription", transcription);
+    images.forEach((img, index) => formData.append(`images`, img));
 
-  const publishListing = () => {
-    // In real app, save to database
-    const listing = {
-      ...aiListing,
-      transcription,
-      images: images.map((img) => URL.createObjectURL(img)),
-      artisan: JSON.parse(localStorage.getItem("artisan_profile") || "{}"),
-      createdAt: new Date().toISOString(),
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-listing`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to publish listing");
     }
 
-    // Save to localStorage for demo
-    const existingListings = JSON.parse(localStorage.getItem("artisan_listings") || "[]")
-    existingListings.push({ ...listing, id: Date.now() })
-    localStorage.setItem("artisan_listings", JSON.stringify(existingListings))
-
-    router.push("/artisan/dashboard?success=true")
+    const data = await response.json();
+    router.push(`/artisan/dashboard?success=true&listingId=${data.listing_id}`);
+    
+  } catch (error) {
+    console.error(error);
+    alert("Error publishing listing. Please try again.");
   }
+};
 
   const steps = [
     { number: 1, title: "Voice Input", description: "Describe your product" },
@@ -384,7 +396,7 @@ const stopRecording = () => {
                   AI-Generated Listing
                 </CardTitle>
                 <CardDescription>
-                  Our AI has analyzed your voice description and images to create a beautiful product listing.
+                  Our AI will analyze your voice description and images to create a beautiful product listing and save it to the database.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -396,7 +408,7 @@ const stopRecording = () => {
                       className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
                     >
                       <Sparkles className="w-5 h-5 mr-2" />
-                      Generate Listing with AI
+                      Generate & Save Listing with AI
                     </Button>
                   </div>
                 )}
@@ -407,8 +419,8 @@ const stopRecording = () => {
                       <Sparkles className="w-8 h-8 text-white" />
                     </div>
                     <div>
-                      <p className="text-lg font-medium text-gray-700 mb-2">AI is working its magic...</p>
-                      <p className="text-sm text-gray-500">Analyzing your description and images</p>
+                      <p className="text-lg font-medium text-gray-700 mb-2">AI is creating your listing...</p>
+                      <p className="text-sm text-gray-500">Analyzing description, processing images, and saving to database</p>
                     </div>
                     <Progress value={66} className="w-64 mx-auto" />
                   </div>
@@ -416,6 +428,16 @@ const stopRecording = () => {
 
                 {aiListing && (
                   <div className="space-y-6">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-5 h-5 text-green-600" />
+                        <span className="text-green-800 font-medium">Listing saved successfully!</span>
+                      </div>
+                      <p className="text-sm text-green-700 mt-1">
+                        Your listing has been created and saved to the database. You can now preview and publish it.
+                      </p>
+                    </div>
+
                     {/* Generated Listing Preview */}
                     <div className="bg-white border border-gray-200 rounded-lg p-6">
                       <div className="flex justify-between items-start mb-4">
@@ -455,7 +477,7 @@ const stopRecording = () => {
                         <div>
                           <Label>Tags</Label>
                           <div className="flex flex-wrap gap-2 mt-1">
-                            {aiListing.tags.map((tag: string, index: number) => (
+                            {aiListing.tags?.map((tag: string, index: number) => (
                               <Badge key={index} variant="secondary">
                                 {tag}
                               </Badge>

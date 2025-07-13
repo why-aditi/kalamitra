@@ -1,35 +1,75 @@
 # Kalamitra Backend API
 
-This is the backend API for Kalamitra, built with FastAPI and Firebase Authentication.
+This is the backend API for Kalamitra, built with FastAPI, MongoDB, and Firebase Authentication.
+
+## Prerequisites
+
+- Python 3.8 or higher
+- MongoDB 6.0 or higher
+- Firebase project with Authentication enabled
+
+## Project Structure
+
+```
+├── controllers/          # Business logic
+│   └── userControllers.py
+├── models/              # Data models
+│   ├── artistModel.py
+│   ├── listingModel.py
+│   ├── profileModel.py
+│   └── userModel.py
+├── routes/              # API endpoints
+│   ├── artists.py
+│   ├── auth.py
+│   ├── listing.py
+│   └── users.py
+├── services/            # External services
+│   ├── database.py
+│   └── generateListing.py
+└── main.py             # Application entry point
+```
 
 ## Setup
 
-1. Install dependencies:
+1. Create and activate virtual environment:
 
-```bash
-python -m venv .venv
-source .venv/Scripts/activate
-pip install -r req.txt
-```
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate  # Windows
+   source .venv/bin/activate  # Unix/macOS
+   ```
 
-2. Set up Firebase:
+2. Install dependencies:
+
+   ```bash
+   pip install -r req.txt
+   ```
+
+3. Set up environment variables:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Update the `.env` file with your configuration.
+
+4. Set up Firebase:
 
    - Create a Firebase project in the Firebase Console
+   - Enable Authentication and select providers
    - Generate a service account key (JSON file)
    - Place the JSON file in the backend directory
-   - Update the path in `main.py` to point to your service account key
+   - Update the `FIREBASE_CREDENTIALS_PATH` in `.env`
 
-3. Run the server:
-
-```bash
-uvicorn main:app --reload
-```
-
-The API will be available at `http://localhost:8000`
+5. Run the development server:
+   ```bash
+   uvicorn main:app --reload
+   ```
+   The API will be available at `http://localhost:8000`
 
 ## API Documentation
 
-Once the server is running, you can access the interactive API documentation at:
+Interactive API documentation is available at:
 
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
@@ -48,21 +88,51 @@ Once the server is running, you can access the interactive API documentation at:
 ### Artist Endpoints
 
 - `GET /api/artists/me` - Get current artist profile
-- `PUT /api/artists/me` - Update current artist profile
+- `PUT /api/artists/me` - Update artist profile
+- `POST /api/artists/portfolio` - Add portfolio item
+- `DELETE /api/artists/portfolio/{id}` - Remove portfolio item
 
-## Role-Based Access Control
+### Listing Endpoints
 
-The API implements two roles:
+- `GET /api/listings` - Get all listings
+- `GET /api/listings/{id}` - Get listing by ID
+- `POST /api/listings` - Create new listing
+- `PUT /api/listings/{id}` - Update listing
+- `DELETE /api/listings/{id}` - Delete listing
 
-1. `user` - Regular user role (default)
-2. `artist` - Artist role with additional privileges
+## Development Guidelines
 
-Roles are managed through Firebase Custom Claims and verified on protected endpoints.
+### Code Style
 
-## Security
+- Follow PEP 8 style guide
+- Use type hints for function parameters and return values
+- Document functions and classes with docstrings
+- Keep functions focused and single-purpose
 
-- Authentication is handled through Firebase
-- All endpoints use HTTPS
-- CORS is configured (update the allowed origins in production)
-- Input validation using Pydantic models
-- Role-based access control using Firebase Custom Claims
+### API Design
+
+- Use RESTful conventions
+- Implement proper error handling
+- Return appropriate HTTP status codes
+- Validate request data using Pydantic models
+
+### Database
+
+- Use Motor for async MongoDB operations
+- Define clear data models with Pydantic
+- Implement proper indexing for performance
+- Handle database errors gracefully
+
+### Authentication
+
+- Validate Firebase tokens
+- Implement role-based access control
+- Secure sensitive routes
+- Handle token expiration
+
+### Error Handling
+
+- Use custom exception handlers
+- Return meaningful error messages
+- Log errors appropriately
+- Handle edge cases

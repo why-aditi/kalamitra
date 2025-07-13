@@ -107,30 +107,113 @@ async def create_listing(
         
         # Create listing document
         listing_data = {
-            **ai_listing,
+            "title": ai_listing.get("title", "Untitled Listing"),
+            "description": ai_listing.get("description", ""),
+            "tags": ai_listing.get("tags", []),
+            "category": ai_listing.get("category", "Crafts"),
+            "suggested_price": ai_listing.get("suggestedPrice", "₹299"),
+            "story": ai_listing.get("story", ""),
             "transcription": transcription,
             "image_ids": image_ids,
             "artist_id": artist_id,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
-            "status": "active"
+            "status": "active",
+            "ai_generated": True,
+            "ai_metadata": {
+                "model": "gemini-2.5-flash",
+                "generated_at": datetime.utcnow(),
+                "fallback_used": ai_listing.get("fallback_used", False)
+            }
         }
         
         # Insert into listings collection
         result = await db.listings.insert_one(listing_data)
         
+        # Return the response with proper structure
         return {
             "message": "Listing created successfully",
             "listing_id": str(result.inserted_id),
             "image_ids": [str(img_id) for img_id in image_ids],
-            "ai_listing": ai_listing,
-            "created_at": listing_data["created_at"].isoformat()
+            "ai_listing": {
+                "title": ai_listing.get("title", "Untitled Listing"),
+                "description": ai_listing.get("description", ""),
+                "tags": ai_listing.get("tags", []),
+                "category": ai_listing.get("category", "Crafts"),
+                "suggestedPrice": ai_listing.get("suggestedPrice", "₹299"),
+                "story": ai_listing.get("story", "")
+            },
+            "created_at": listing_data["created_at"].isoformat(),
+            "status": "success"
         }
         
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating listing: {str(e)}")
+
+# Also add an endpoint to update listing status if needed
+@router.patch("/listings/{listing_id}/status")
+async def update_listing_status(
+    listing_id: str,
+    status: str,
+    db: AsyncIOMotorDatabase = Depends(Database.get_db)
+):
+    """Update listing status (active, inactive, draft, published)"""
+    try:
+        valid_statuses = ["active", "inactive", "draft", "published"]
+        if status not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        
+        result = await db.listings.update_one(
+            {"_id": ObjectId(listing_id)},
+            {
+                "$set": {
+                    "status": status,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        
+        return {"message": f"Listing status updated to {status}"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating listing status: {str(e)}")
+
+# Add an endpoint to get listing by ID for verification
+@router.get("/listings/{listing_id}/verify")
+async def verify_listing(
+    listing_id: str,
+    db: AsyncIOMotorDatabase = Depends(Database.get_db)
+):
+    """Verify that a listing exists and return basic info"""
+    try:
+        listing = await db.listings.find_one(
+            {"_id": ObjectId(listing_id)},
+            {"title": 1, "status": 1, "created_at": 1, "artist_id": 1}
+        )
+        
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        
+        return {
+            "listing_id": str(listing["_id"]),
+            "title": listing["title"],
+            "status": listing["status"],
+            "created_at": listing["created_at"].isoformat(),
+            "artist_id": listing.get("artist_id"),
+            "exists": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error verifying listing: {str(e)}")
 
 @router.get("/listings/{listing_id}/images/{image_id}")
 async def get_image(
