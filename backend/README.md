@@ -76,8 +76,8 @@ Interactive API documentation is available at:
 
 ### Authentication Endpoints
 
-- `POST /api/auth/register` - Register a new user
-- `POST /api/auth/verify-token` - Verify Firebase ID token
+- `POST /api/register` - Register a new user
+- `POST /api/verify-token` - Verify Firebase ID token
 
 ### User Endpoints
 

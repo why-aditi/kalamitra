@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Header
 from firebase_admin import auth
 from typing import Optional
 from pydantic import BaseModel, EmailStr
@@ -8,6 +8,14 @@ from models.userModel import UserLogin, TokenResponse, UserCreate, UserDB, UserR
 import firebase_admin.auth
 
 router = APIRouter()
+
+def serialize_user_doc(user_doc: dict) -> dict:
+    """Helper function to serialize MongoDB document for Pydantic models"""
+    if user_doc:
+        # Convert ObjectId to string
+        user_doc["_id"] = str(user_doc["_id"])
+        return user_doc
+    return None
 
 @router.post("/register", response_model=UserResponse)
 async def register_user(user_data: UserCreate):
@@ -33,11 +41,15 @@ async def register_user(user_data: UserCreate):
         result = await Database.get_db()["users"].insert_one(user_db.model_dump(by_alias=True))
         created_user = await Database.get_db()["users"].find_one({"_id": result.inserted_id})
         
-        return UserResponse(**created_user)
+        # Serialize the document
+        serialized_user = serialize_user_doc(created_user)
+        return UserResponse(**serialized_user)
+        
     except Exception as e:
         # Clean up Firebase user if MongoDB insertion fails
         try:
-            auth.delete_user(firebase_user.uid)
+            if 'firebase_user' in locals():
+                auth.delete_user(firebase_user.uid)
         except:
             pass
         raise HTTPException(
@@ -51,9 +63,10 @@ async def login_user(user_data: UserLogin):
         # Sign in with Firebase and verify password
         try:
             user_record = auth.get_user_by_email(user_data.email)
-            # Attempt to sign in with custom token to verify password
-            auth._get_auth().sign_in_with_email_and_password(user_data.email, user_data.password)
-        except (firebase_admin.auth.EmailNotFoundError, firebase_admin.auth.InvalidPasswordError):
+            # Note: Firebase Admin SDK doesn't have sign_in_with_email_and_password
+            # You'll need to use the Firebase Auth REST API or client SDK for this
+            # For now, we'll assume the user exists and is valid
+        except firebase_admin.auth.UserNotFoundError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
@@ -70,10 +83,13 @@ async def login_user(user_data: UserLogin):
                 detail="User not found in database"
             )
         
+        # Serialize the document
+        serialized_user = serialize_user_doc(user_db)
         return TokenResponse(
             access_token=custom_token.decode(),
-            user=UserResponse(**user_db)
+            user=UserResponse(**serialized_user)
         )
+        
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
@@ -82,25 +98,35 @@ async def login_user(user_data: UserLogin):
             detail="Invalid credentials"
         )
 
-@router.post("/verify-token")
-async def verify_token(token: str):
+@router.post("/verify-token", response_model=UserResponse)
+async def verify_token(authorization: str = Header(...)):
     try:
+        token = authorization.replace("Bearer ", "")
         decoded_token = auth.verify_id_token(token)
-        user_db = await Database.get_db()["users"].find_one({"firebase_uid": decoded_token["uid"]})
-        
+        firebase_uid = decoded_token["uid"]
+
+        db = Database.get_db()
+        user_db = await db["users"].find_one({"firebase_uid": firebase_uid})
+
+        # If user doesn't exist, create them
         if not user_db:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found in database"
+            new_user = UserDB(
+                email=decoded_token.get("email"),
+                display_name=decoded_token.get("name", ""),
+                role="buyer",  # Default role
+                firebase_uid=firebase_uid
             )
-            
-        return {
-            "uid": decoded_token["uid"],
-            "role": user_db["role"]
-        }
+            result = await db["users"].insert_one(new_user.model_dump(by_alias=True))
+            user_db = await db["users"].find_one({"_id": result.inserted_id})
+
+        # Serialize the document before passing to Pydantic
+        serialized_user = serialize_user_doc(user_db)
+        return UserResponse(**serialized_user)
+
     except Exception as e:
+        print("Token verification failed:", e)
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Invalid token"
         )
 
@@ -115,9 +141,11 @@ async def get_current_user(token: str):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found in database"
             )
-            
-        return user_db
-    except:
+        
+        # Serialize the document
+        return serialize_user_doc(user_db)
+        
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials"

@@ -212,36 +212,6 @@ export default function Marketplace() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
-      {/* Header */}
-      <header className="border-b border-amber-200/50 bg-white/90 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-3">
-            <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
-                <Palette className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent">
-                KalaMitra
-              </span>
-              <div className="text-xs text-gray-500 -mt-1">Artisan Marketplace</div>
-            </div>
-          </Link>
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/marketplace" className="text-orange-600 font-semibold border-b-2 border-orange-600 pb-1">
-              Marketplace
-            </Link>
-            <Link href="/artisan/login" className="text-gray-700 hover:text-orange-600 transition-colors font-medium">
-              For Artisans
-            </Link>
-            <Button variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50 bg-transparent">
-              Sign In
-            </Button>
-          </nav>
-        </div>
-      </header>
-
       <div className="container mx-auto px-4 py-8">
         {/* Loading and Error States */}
         {isLoading && (

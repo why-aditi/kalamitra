@@ -1,3 +1,4 @@
+import { NavBar } from '@/components/nav-bar'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -7,44 +8,6 @@ import Link from "next/link"
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
-      {/* Header */}
-      <header className="border-b border-amber-200/50 bg-white/90 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
-                <Palette className="w-6 h-6 text-white" />
-              </div>
-              {/* <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full animate-pulse"></div> */}
-            </div>
-            <div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent">
-                KalaMitra
-              </span>
-              <div className="text-xs text-gray-500 -mt-1">Artisan Marketplace</div>
-            </div>
-          </div>
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/marketplace" className="text-gray-700 hover:text-orange-600 transition-colors font-medium">
-              Explore
-            </Link>
-            <Link href="/artisan/login" className="text-gray-700 hover:text-orange-600 transition-colors font-medium">
-              For Artisans
-            </Link>
-            <Link href="/about" className="text-gray-700 hover:text-orange-600 transition-colors font-medium">
-              About
-            </Link>
-            <Button
-              variant="outline"
-              className="border-orange-300 text-orange-600 hover:bg-orange-50 bg-transparent"
-              asChild
-            >
-              <Link href="/buyer/login">Sign In</Link>
-            </Button>
-          </nav>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-amber-100/20 via-orange-100/20 to-rose-100/20"></div>

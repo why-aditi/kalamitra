@@ -1,8 +1,12 @@
 import type { Metadata } from 'next'
+import { AuthProvider } from '@/components/providers/auth-provider'
+import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
+import { NavBar } from '@/components/nav-bar'
 
 export const metadata: Metadata = {
   title: 'Kalamitra',
+  description: 'Connecting artisans with art lovers',
 }
 
 export default function RootLayout({
@@ -12,7 +16,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <NavBar/>
+          <main className="min-h-screen">
+            {children}
+          </main>
+          <Toaster />
+        </AuthProvider>
+      </body>
     </html>
   )
 }

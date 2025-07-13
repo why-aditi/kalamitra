@@ -26,6 +26,7 @@ class UserBase(BaseModel):
 
 class UserDB(UserBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    firebase_uid: str  # This was missing!
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -35,18 +36,20 @@ class UserDB(UserBase):
         json_encoders = {ObjectId: str}
 
 class UserResponse(UserBase):
-    id: str
+    id: str = Field(alias="_id")
+    firebase_uid: str
     created_at: datetime
     updated_at: datetime
 
     class Config:
-        from_attributes = True
+        validate_by_name = True
+        json_encoders = {ObjectId: str}
         
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     display_name: str
-    role: str = "user"  # Default role is user
+    role: str = "user"
 
 class UserLogin(BaseModel):
     email: EmailStr
