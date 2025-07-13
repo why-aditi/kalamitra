@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,12 +25,12 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition"
 
 export default function CreateListing() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [isRecording, setIsRecording] = useState(false)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [transcription, setTranscription] = useState("")
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [images, setImages] = useState<File[]>([])
@@ -39,53 +38,31 @@ export default function CreateListing() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [editMode, setEditMode] = useState(false)
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+const {
+  transcript,
+  listening,
+  resetTranscript,
+  browserSupportsSpeechRecognition,
+} = useSpeechRecognition();
 
-  // Voice Recording Functions
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-
-      const chunks: BlobPart[] = []
-      mediaRecorder.ondataavailable = (event) => {
-        chunks.push(event.data)
-      }
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "audio/wav" })
-        setAudioBlob(blob)
-        transcribeAudio(blob)
-        stream.getTracks().forEach((track) => track.stop())
-      }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-    } catch (error) {
-      console.error("Error accessing microphone:", error)
-      alert("Unable to access microphone. Please check permissions.")
-    }
+const startRecording = () => {
+  if (!browserSupportsSpeechRecognition) {
+    alert("Browser does not support speech recognition.");
+    return;
   }
+  resetTranscript();
+  SpeechRecognition.startListening({ continuous: true, language: "en-IN" });
+  setIsRecording(true);
+};
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-    }
-  }
+const stopRecording = () => {
+  SpeechRecognition.stopListening();
+  setIsRecording(false);
+  setTranscription(transcript);
+  console.log("Transcription:", transcript);
+};
 
-  const transcribeAudio = async (blob: Blob) => {
-    setIsTranscribing(true)
-    // Simulate transcription (in real app, use Web Speech API or send to backend)
-    setTimeout(() => {
-      setTranscription(
-        "Beautiful handmade clay diya from Rajasthan. Made with traditional techniques passed down through generations. Perfect for festivals and home decoration. Natural clay with intricate patterns.",
-      )
-      setIsTranscribing(false)
-    }, 2000)
-  }
 
   // Image Upload Functions
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,43 +85,76 @@ export default function CreateListing() {
   }, [])
 
   // AI Generation
-  const generateListing = async () => {
-    if (!transcription || images.length === 0) return
+const generateListing = async () => {
+  if (!transcription || images.length === 0) return;
 
-    setIsGenerating(true)
-    // Simulate AI generation (in real app, call OpenAI API)
-    setTimeout(() => {
-      setAiListing({
-        title: "Handcrafted Rajasthani Clay Diya Set",
-        description:
-          "Exquisite handmade clay diyas crafted using traditional Rajasthani techniques passed down through generations. Each diya is carefully shaped and decorated with intricate patterns, perfect for festivals, celebrations, and home decoration. Made from natural clay sourced locally, these diyas bring warmth and traditional charm to any space.",
-        tags: ["Handmade", "Clay", "Diya", "Rajasthani", "Traditional", "Festival", "Home Decor"],
-        category: "Home & Decor",
-        suggestedPrice: "₹299",
-        story:
-          "Crafted in the heart of Rajasthan by skilled artisans who have been perfecting this art for generations. Each piece tells a story of tradition, culture, and the timeless beauty of Indian craftsmanship.",
-      })
-      setIsGenerating(false)
-    }, 3000)
-  }
+  setIsGenerating(true);
 
-  const publishListing = () => {
-    // In real app, save to database
-    const listing = {
-      ...aiListing,
-      transcription,
-      images: images.map((img) => URL.createObjectURL(img)),
-      artisan: JSON.parse(localStorage.getItem("artisan_profile") || "{}"),
-      createdAt: new Date().toISOString(),
+  try {
+    const formData = new FormData();
+    formData.append("transcription", transcription);
+    images.forEach((img, index) => formData.append(`images`, img));
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-listing`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to generate listing");
     }
 
-    // Save to localStorage for demo
-    const existingListings = JSON.parse(localStorage.getItem("artisan_listings") || "[]")
-    existingListings.push({ ...listing, id: Date.now() })
-    localStorage.setItem("artisan_listings", JSON.stringify(existingListings))
-
-    router.push("/artisan/dashboard?success=true")
+    const data = await response.json();
+    
+    // Fix: Extract the AI listing data from the nested response
+    setAiListing({
+      ...data.ai_listing, // This contains the actual AI generated content
+      listingId: data.listing_id, // Store the database ID
+      imageIds: data.image_ids,
+      createdAt: data.created_at
+    });
+    
+    console.log("AI Listing Generated:", data);
+    
+  } catch (error) {
+    console.error(error);
+    alert("Error generating listing. Please try again.");
+  } finally {
+    setIsGenerating(false);
   }
+};
+
+// Update the publishListing function to handle already saved listing
+const publishListing = async () => {
+  try {
+    // If we already have a listing ID, just redirect to dashboard
+    if (aiListing?.listingId) {
+      router.push(`/artisan/dashboard?success=true&listingId=${aiListing.listingId}`);
+      return;
+    }
+    
+    // Fallback: If for some reason we don't have a listing ID, create it now
+    const formData = new FormData();
+    formData.append("transcription", transcription);
+    images.forEach((img, index) => formData.append(`images`, img));
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-listing`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to publish listing");
+    }
+
+    const data = await response.json();
+    router.push(`/artisan/dashboard?success=true&listingId=${data.listing_id}`);
+    
+  } catch (error) {
+    console.error(error);
+    alert("Error publishing listing. Please try again.");
+  }
+};
 
   const steps = [
     { number: 1, title: "Voice Input", description: "Describe your product" },
@@ -251,30 +261,34 @@ export default function CreateListing() {
                 </div>
 
                 {/* Transcription */}
-                {(isTranscribing || transcription) && (
+                {(isTranscribing || transcription || isRecording) && (
                   <div className="space-y-4">
                     <Label>Transcription</Label>
-                    {isTranscribing ? (
+                    {isRecording ? (
+                      <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
+                        <RefreshCw className="w-4 h-4 animate-spin text-orange-500" />
+                        <span className="text-gray-600">Listening... Speak now!</span>
+                      </div>
+                    ) : isTranscribing ? (
                       <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
                         <RefreshCw className="w-4 h-4 animate-spin text-orange-500" />
                         <span className="text-gray-600">Transcribing your voice...</span>
                       </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={transcription}
-                          onChange={(e) => setTranscription(e.target.value)}
-                          rows={4}
-                          className="resize-none"
-                        />
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={startRecording}>
-                            <Mic className="w-4 h-4 mr-1" />
-                            Re-record
-                          </Button>
-                        </div>
+                    ) : null}
+                    <div className="space-y-2">
+                      <Textarea
+                        value={isRecording ? transcript : transcription}
+                        onChange={(e) => setTranscription(e.target.value)}
+                        rows={4}
+                        className="resize-none"
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={startRecording}>
+                          <Mic className="w-4 h-4 mr-1" />
+                          Re-record
+                        </Button>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
@@ -382,7 +396,7 @@ export default function CreateListing() {
                   AI-Generated Listing
                 </CardTitle>
                 <CardDescription>
-                  Our AI has analyzed your voice description and images to create a beautiful product listing.
+                  Our AI will analyze your voice description and images to create a beautiful product listing and save it to the database.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -394,7 +408,7 @@ export default function CreateListing() {
                       className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
                     >
                       <Sparkles className="w-5 h-5 mr-2" />
-                      Generate Listing with AI
+                      Generate & Save Listing with AI
                     </Button>
                   </div>
                 )}
@@ -405,8 +419,8 @@ export default function CreateListing() {
                       <Sparkles className="w-8 h-8 text-white" />
                     </div>
                     <div>
-                      <p className="text-lg font-medium text-gray-700 mb-2">AI is working its magic...</p>
-                      <p className="text-sm text-gray-500">Analyzing your description and images</p>
+                      <p className="text-lg font-medium text-gray-700 mb-2">AI is creating your listing...</p>
+                      <p className="text-sm text-gray-500">Analyzing description, processing images, and saving to database</p>
                     </div>
                     <Progress value={66} className="w-64 mx-auto" />
                   </div>
@@ -414,6 +428,16 @@ export default function CreateListing() {
 
                 {aiListing && (
                   <div className="space-y-6">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-5 h-5 text-green-600" />
+                        <span className="text-green-800 font-medium">Listing saved successfully!</span>
+                      </div>
+                      <p className="text-sm text-green-700 mt-1">
+                        Your listing has been created and saved to the database. You can now preview and publish it.
+                      </p>
+                    </div>
+
                     {/* Generated Listing Preview */}
                     <div className="bg-white border border-gray-200 rounded-lg p-6">
                       <div className="flex justify-between items-start mb-4">
@@ -453,7 +477,7 @@ export default function CreateListing() {
                         <div>
                           <Label>Tags</Label>
                           <div className="flex flex-wrap gap-2 mt-1">
-                            {aiListing.tags.map((tag: string, index: number) => (
+                            {aiListing.tags?.map((tag: string, index: number) => (
                               <Badge key={index} variant="secondary">
                                 {tag}
                               </Badge>
