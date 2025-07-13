@@ -234,15 +234,17 @@ async def get_image(
             raise HTTPException(status_code=404, detail="Image not found in listing")
         
         # Get image from GridFS
-        download_stream = await bucket.open_download_stream(ObjectId(image_id))
-        image_data = await download_stream.read()
-        
-        # Get file info
-        file_info = await bucket.find({"_id": ObjectId(image_id)}).to_list(length=1)
-        if not file_info:
+        try:
+            download_stream = await bucket.open_download_stream(ObjectId(image_id))
+        except:
             raise HTTPException(status_code=404, detail="Image file not found")
         
-        content_type = file_info[0].metadata.get("content_type", "image/jpeg")
+        # Get file info directly from the download stream
+        content_type = "image/jpeg"  # default fallback
+        if hasattr(download_stream, 'file') and hasattr(download_stream.file, 'metadata'):
+            content_type = download_stream.file.metadata.get("content_type", "image/jpeg")
+        
+        image_data = await download_stream.read()
         
         return Response(content=image_data, media_type=content_type)
         
