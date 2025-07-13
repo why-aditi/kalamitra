@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,7 +31,6 @@ export default function CreateListing() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [isRecording, setIsRecording] = useState(false)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [transcription, setTranscription] = useState("")
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [images, setImages] = useState<File[]>([])
@@ -40,42 +38,31 @@ export default function CreateListing() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [editMode, setEditMode] = useState(false)
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const {
-    transcript,
-    listening,
-    resetTranscript,
-    browserSupportsSpeechRecognition,
-  } = useSpeechRecognition()
+const {
+  transcript,
+  listening,
+  resetTranscript,
+  browserSupportsSpeechRecognition,
+} = useSpeechRecognition();
 
-  // Voice Recording Functions
-  const startRecording = () => {
-    if (!browserSupportsSpeechRecognition) {
-      alert("Browser does not support speech recognition.")
-      return
-    }
-    resetTranscript()
-    SpeechRecognition.startListening({ continuous: true, language: "en-IN" })
-    setIsRecording(true)
+const startRecording = () => {
+  if (!browserSupportsSpeechRecognition) {
+    alert("Browser does not support speech recognition.");
+    return;
   }
+  resetTranscript();
+  SpeechRecognition.startListening({ continuous: true, language: "en-IN" });
+  setIsRecording(true);
+};
 
-  const stopRecording = () => {
-    SpeechRecognition.stopListening()
-    setIsRecording(false)
-    setTranscription(transcript)
-  }
+const stopRecording = () => {
+  SpeechRecognition.stopListening();
+  setIsRecording(false);
+  setTranscription(transcript);
+  console.log("Transcription:", transcript);
+};
 
-  const transcribeAudio = async (blob: Blob) => {
-    setIsTranscribing(true)
-    // Simulate transcription (in real app, use Web Speech API or send to backend)
-    setTimeout(() => {
-      setTranscription(
-        "Beautiful handmade clay diya from Rajasthan. Made with traditional techniques passed down through generations. Perfect for festivals and home decoration. Natural clay with intricate patterns.",
-      )
-      setIsTranscribing(false)
-    }, 2000)
-  }
 
   // Image Upload Functions
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,24 +86,45 @@ export default function CreateListing() {
 
   // AI Generation
   const generateListing = async () => {
-    if (!transcription || images.length === 0) return
+  if (!transcription || images.length === 0) return;
 
-    setIsGenerating(true)
-    // Simulate AI generation (in real app, call OpenAI API)
-    setTimeout(() => {
-      setAiListing({
-        title: "Handcrafted Rajasthani Clay Diya Set",
-        description:
-          "Exquisite handmade clay diyas crafted using traditional Rajasthani techniques passed down through generations. Each diya is carefully shaped and decorated with intricate patterns, perfect for festivals, celebrations, and home decoration. Made from natural clay sourced locally, these diyas bring warmth and traditional charm to any space.",
-        tags: ["Handmade", "Clay", "Diya", "Rajasthani", "Traditional", "Festival", "Home Decor"],
-        category: "Home & Decor",
-        suggestedPrice: "₹299",
-        story:
-          "Crafted in the heart of Rajasthan by skilled artisans who have been perfecting this art for generations. Each piece tells a story of tradition, culture, and the timeless beauty of Indian craftsmanship.",
-      })
-      setIsGenerating(false)
-    }, 3000)
+  setIsGenerating(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("transcription", transcription);
+    images.forEach((img, index) => formData.append(`images`, img));
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/generate-listing`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to generate listing");
+    }
+
+    const data = await response.json();
+    setAiListing(data);
+    console.log("AI Listing Generated:", aiListing);
+  } catch (error) {
+    console.error(error);
+    alert("Error generating listing. Please try again.");
+  } finally {
+    setIsGenerating(false);
   }
+};
+
+  // setAiListing({
+  //   title: "Handcrafted Rajasthani Clay Diya Set",
+  //   description:
+  //     "Exquisite handmade clay diyas crafted using traditional Rajasthani techniques passed down through generations. Each diya is carefully shaped and decorated with intricate patterns, perfect for festivals, celebrations, and home decoration. Made from natural clay sourced locally, these diyas bring warmth and traditional charm to any space.",
+  //   tags: ["Handmade", "Clay", "Diya", "Rajasthani", "Traditional", "Festival", "Home Decor"],
+  //   category: "Home & Decor",
+  //   suggestedPrice: "₹299",
+  //   story:
+  //     "Crafted in the heart of Rajasthan by skilled artisans who have been perfecting this art for generations. Each piece tells a story of tradition, culture, and the timeless beauty of Indian craftsmanship.",
+  // })
 
   const publishListing = () => {
     // In real app, save to database

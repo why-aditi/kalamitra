@@ -1,4 +1,6 @@
-# Dependency for protected routes
+from routes import auth
+from database import Database
+from fastapi import Depends, HTTPException, status
 async def get_current_user(token: str):
     try:
         decoded_token = auth.verify_id_token(token)

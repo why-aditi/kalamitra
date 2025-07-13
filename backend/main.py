@@ -1,5 +1,5 @@
-from routes import auth, users, artists
-from fastapi import FastAPI, Depends, HTTPException, status
+from routes import auth, users, artists, listing
+from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -13,29 +13,40 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize Firebase Admin
-cred = credentials.Certificate(os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH"))
+cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+if not cred_path:
+    raise RuntimeError("Missing FIREBASE_SERVICE_ACCOUNT_PATH in environment variables")
+cred = credentials.Certificate(cred_path)
 firebase_admin_app = firebase_admin.initialize_app(cred)
 
+# Lifespan context for FastAPI
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await Database.connect_db()
+    yield
+    await Database.close_db()
 
 app = FastAPI(
     title="Kalamitra API",
     description="API for Kalamitra - Artist Management Platform",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with your frontend domain
+    allow_origins=["*"],  # Change in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(users.router, prefix="/api/users", tags=["Users"])
-app.include_router(artists.router, prefix="/api/artists", tags=["Artists"])
+app.include_router(auth.router, prefix="/api", tags=["Authentication"])
+app.include_router(users.router, prefix="/api", tags=["Users"])
+app.include_router(artists.router, prefix="/api", tags=["Artists"])
+app.include_router(listing.router, prefix="/api", tags=["Listings"])
 
 @app.get("/")
 async def root():
@@ -44,24 +55,6 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs"
     }
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    try:
-        # Test database connection
-        db = Database.get_database()
-        await db.command("ping")
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "firebase": "initialized"
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Health check failed: {str(e)}"
-        )
 
 if __name__ == "__main__":
     uvicorn.run(
