@@ -554,7 +554,7 @@ export default function Marketplace() {
                                 ))}
                               </div>
 
-                              {/* Price */}
+                              {/* Price and Buy Now Button */}
                               <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                                 <div className="flex items-center gap-3">
                                   <span className="text-2xl font-bold text-orange-600">₹{product.price}</span>
@@ -562,9 +562,17 @@ export default function Marketplace() {
                                     <span className="text-sm text-gray-500 line-through">₹{product.originalPrice}</span>
                                   )}
                                 </div>
-                                <Badge variant="outline" className="border-orange-200 text-orange-700">
-                                  {product.category}
-                                </Badge>
+                                <div className="flex flex-col items-end gap-2">
+                                  <Badge variant="outline" className="border-orange-200 text-orange-700 mb-2">
+                                    {product.category}
+                                  </Badge>
+                                  <Button
+                                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 text-sm font-semibold shadow"
+                                    onClick={() => alert('Buy Now functionality coming soon!')}
+                                  >
+                                    Buy Now
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </CardContent>

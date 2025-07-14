@@ -95,8 +95,20 @@ const generateListing = async () => {
     formData.append("transcription", transcription);
     images.forEach((img, index) => formData.append(`images`, img));
 
-    // Get Firebase token from localStorage (set by AuthProvider)
-    const token = localStorage.getItem('accessToken');
+
+    // Always get a fresh Firebase token from the current user
+    let token = null;
+    try {
+      const { getAuth } = await import('firebase/auth');
+      const { auth } = await import('@/lib/firebase');
+      const currentUser = getAuth().currentUser;
+      if (currentUser) {
+        token = await currentUser.getIdToken(true); // force refresh
+      }
+    } catch (e) {
+      // fallback to localStorage if needed
+      token = localStorage.getItem('accessToken');
+    }
     if (!token) {
       alert("You must be signed in to create a listing.");
       setIsGenerating(false);

@@ -150,7 +150,7 @@ async def get_artist_listings(current_user: dict = Depends(check_artist_role)):
                 detail="Artisan profile not found in database."
             )
 
-        listings = await db["listings"].find({"artisan_id": artisan_profile_doc["firebase_uid"]}).to_list(None)
+        listings = await db["listings"].find({"artist_id": artisan_profile_doc["firebase_uid"]}).to_list(None)
         serialized_listings = [Listing(**listing) for listing in listings]
         return ListingsResponse(
             listings=serialized_listings,  # or your fetched listings
