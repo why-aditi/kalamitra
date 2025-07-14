@@ -3,6 +3,7 @@ from firebase_admin import auth
 from typing import List, Optional
 from .auth import get_current_user, check_artist_role
 from models.artistModel import ArtistProfile, ArtistProfileUpdate, ArtisanOnboardingData, ArtisanProfileDB, ArtisanProfileResponse
+from models.listingModel import Listing
 from services.database import Database
 
 def serialize_artisan_doc(artisan_doc: dict) -> dict:
@@ -135,6 +136,39 @@ async def update_artist_profile(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Artist not found"
+        )
+        
+@router.get("/artist/listings", response_model=List[Listing])
+async def get_artist_listings(current_user: dict = Depends(check_artist_role)):
+    try:
+        db = Database.get_db()
+        artisan_profile_doc = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
+
+        if not artisan_profile_doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Artisan profile not found in database."
+            )
+
+        listings = await db["listings"].find({"artisan_id": artisan_profile_doc["firebase_uid"]}).to_list(None)
+        serialized_listings = [Listing(**listing) for listing in listings]
+        return serialized_listings
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch listings: {str(e)}"
+        )
+    except auth.UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artist not found in Firebase."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
         )
 
 @router.get("/public/{artist_id}", response_model=ArtistProfile)

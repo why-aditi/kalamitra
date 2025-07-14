@@ -8,6 +8,7 @@ from services.generateListing import generate_listing_with_gemini
 from datetime import datetime
 from bson import ObjectId
 import uuid
+from routes.auth import get_current_user
 
 router = APIRouter()
 
@@ -66,7 +67,7 @@ async def get_listing(
 async def create_listing(
     transcription: str = Form(...),
     images: List[UploadFile] = File(...),
-    artist_id: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(Database.get_db),
 ):
     """Create a new listing with images and AI-generated content"""
@@ -104,9 +105,11 @@ async def create_listing(
         
         # Generate AI listing content
         ai_listing = await generate_listing_with_gemini(transcription, images)
+        firebase_uid = current_user["firebase_uid"]
         
         # Create listing document
         listing_data = {
+            "artist_id": firebase_uid,
             "title": ai_listing.get("title", "Untitled Listing"),
             "description": ai_listing.get("description", ""),
             "tags": ai_listing.get("tags", []),
@@ -115,7 +118,6 @@ async def create_listing(
             "story": ai_listing.get("story", ""),
             "transcription": transcription,
             "image_ids": image_ids,
-            "artist_id": artist_id,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
             "status": "active",

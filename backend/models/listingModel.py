@@ -8,3 +8,4 @@ class Listing(BaseModel):
     category: str
     suggestedPrice: str
     story: str
+    artisan_id: str

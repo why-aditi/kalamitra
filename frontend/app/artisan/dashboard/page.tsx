@@ -83,7 +83,7 @@ export default function ArtisanDashboard() {
           // Fetch profile and listings in parallel
           const [profileResponse, listingsResponse] = await Promise.all([
             api.get<ArtisanProfile>('/api/artist/me'),
-            api.get<ListingsResponse>('/api/listings')
+            api.get<ListingsResponse>('/api/artist/listings')
           ]);
 
           console.log("Fetched Artisan Profile:", profileResponse);
