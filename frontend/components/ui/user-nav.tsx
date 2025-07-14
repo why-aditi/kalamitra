@@ -13,7 +13,6 @@ import {
   DropdownMenuGroup,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserRole } from '@/types/auth';
 
 export function UserNav() {
   const { user, profile, signOut } = useAuthContext();
@@ -38,7 +37,7 @@ export function UserNav() {
           { href: '/artisan/products', label: 'My Products' },
           { href: '/artisan/orders', label: 'Orders' },
         ];
-      case 'buyer':
+      case 'user':
         return [
           ...commonLinks,
           { href: '/buyer/orders', label: 'My Orders' },
