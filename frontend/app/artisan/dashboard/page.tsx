@@ -39,6 +39,13 @@ interface ArtisanProfile {
   bio?: string;
 }
 
+interface ListingsResponse {
+  listings: Listing[];
+  total: number;
+  limit: number;
+  skip: number;
+}
+
 interface Listing {
   _id: string;
   title: string;
@@ -76,7 +83,7 @@ export default function ArtisanDashboard() {
           // Fetch profile and listings in parallel
           const [profileResponse, listingsResponse] = await Promise.all([
             api.get<ArtisanProfile>('/api/artist/me'),
-            api.get<Listing[]>('/api/listings')
+            api.get<ListingsResponse>('/api/listings')
           ]);
 
           console.log("Fetched Artisan Profile:", profileResponse);
@@ -84,15 +91,11 @@ export default function ArtisanDashboard() {
           
           setArtisanProfile(profileResponse);
           
-          // Handle listings response - ensure it's an array
-          if (Array.isArray(listingsResponse)) {
-            setListings(listingsResponse);
-          } else if (listingsResponse && Array.isArray(listingsResponse)) {
-            // If the response is wrapped in a data property
-            setListings(listingsResponse);
+          if (listingsResponse && Array.isArray(listingsResponse.listings)) {
+            setListings(listingsResponse.listings);
           } else {
-            console.warn("Listings response is not an array:", listingsResponse);
-            setListings([]); // Fallback to empty array
+            console.warn("Listings response is invalid:", listingsResponse);
+            setListings([]);
           }
 
           // Mock orders for now, can be replaced with a real API call
