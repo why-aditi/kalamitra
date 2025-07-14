@@ -95,9 +95,21 @@ const generateListing = async () => {
     formData.append("transcription", transcription);
     images.forEach((img, index) => formData.append(`images`, img));
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-listing`, {
+    // Get Firebase token from localStorage (set by AuthProvider)
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      alert("You must be signed in to create a listing.");
+      setIsGenerating(false);
+      return;
+    }
+
+    const response = await fetch(`/api/create-listing`, {
       method: "POST",
       body: formData,
+      headers: {
+        Authorization: `Bearer ${token}`
+        // Do NOT set Content-Type for FormData; browser will set it with boundary
+      },
     });
 
     if (!response.ok) {
@@ -105,17 +117,13 @@ const generateListing = async () => {
     }
 
     const data = await response.json();
-    
-    // Fix: Extract the AI listing data from the nested response
     setAiListing({
       ...data.ai_listing, // This contains the actual AI generated content
       listingId: data.listing_id, // Store the database ID
       imageIds: data.image_ids,
       createdAt: data.created_at
     });
-    
     console.log("AI Listing Generated:", data);
-    
   } catch (error) {
     console.error(error);
     alert("Error generating listing. Please try again.");
