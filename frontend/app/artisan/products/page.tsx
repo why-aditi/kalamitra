@@ -14,6 +14,7 @@ interface Listing {
   category: string;
   images?: string[];
 }
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export default function ArtisanProducts() {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -23,7 +24,13 @@ export default function ArtisanProducts() {
     // Fetch the artisan's listings from the backend
     const fetchListings = async () => {
       try {
-        const res = await fetch("/api/artist/listings");
+        const token = localStorage.getItem("accessToken");
+        const res = await fetch(`${BASE_URL}/api/artist/listings`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+      });
         if (!res.ok) throw new Error("Failed to fetch listings");
         const data = await res.json();
         setListings(data.listings || data || []);

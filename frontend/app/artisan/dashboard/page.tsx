@@ -1,12 +1,10 @@
-"use client"
+"use client";
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/components/providers/auth-provider";
-import { api } from "@/lib/api-client";
 
-// Import your UI components
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +22,8 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Heart,
 } from "lucide-react";
 
-// --- Define Types for your data for better type safety ---
 interface ArtisanProfile {
   id: string;
   name: string;
@@ -65,6 +61,8 @@ interface Order {
   quantity: number;
 }
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
 export default function ArtisanDashboard() {
   const searchParams = useSearchParams();
   const { profile: authProfile, loading: authLoading } = useAuthContext();
@@ -76,43 +74,46 @@ export default function ArtisanDashboard() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+
+    const fetchWithAuth = async <T,>(endpoint: string): Promise<T> => {
+      const res = await fetch(`${BASE_URL}${endpoint}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || res.statusText || "API Error");
+      }
+
+      return res.json();
+    };
+
     const fetchData = async () => {
-      if (authProfile && authProfile.role === 'artisan') {
+      if (authProfile && authProfile.role === "artisan") {
         setLoadingData(true);
         try {
-          // Fetch profile and listings in parallel
           const [profileResponse, listingsResponse] = await Promise.all([
-            api.get<ArtisanProfile>('/api/artist/me'),
-            api.get<ListingsResponse>('/api/artist/listings')
+            fetchWithAuth<ArtisanProfile>("/api/artist/me"),
+            fetchWithAuth<ListingsResponse>("/api/artist/listings"),
           ]);
 
-          console.log("Fetched Artisan Profile:", profileResponse);
-          console.log("Fetched Listings Response:", listingsResponse);
-          
           setArtisanProfile(profileResponse);
-          
-          if (listingsResponse && Array.isArray(listingsResponse.listings)) {
-            setListings(listingsResponse.listings);
-          } else {
-            console.warn("Listings response is invalid:", listingsResponse);
-            setListings([]);
-          }
-
-          // Mock orders for now, can be replaced with a real API call
+          setListings(listingsResponse?.listings ?? []);
           setOrders([
             { id: 1, productTitle: "Handcrafted Clay Diya", buyer: "Priya S.", amount: "₹299", status: "pending", date: "2024-01-15", quantity: 2 },
             { id: 2, productTitle: "Pottery Vase", buyer: "Amit K.", amount: "₹599", status: "confirmed", date: "2024-01-14", quantity: 1 },
           ]);
-
         } catch (error) {
           console.error("Failed to fetch artisan dashboard data:", error);
-          // Ensure listings is always an array even on error
           setListings([]);
         } finally {
           setLoadingData(false);
         }
       } else if (!authLoading) {
-        // If auth is done and user is not an artisan, stop loading
         setLoadingData(false);
       }
     };
@@ -126,12 +127,8 @@ export default function ArtisanDashboard() {
     }
   }, [authProfile, authLoading, searchParams]);
 
-  // Show a loading screen while authentication or data fetching is in progress
-  if (authLoading || loadingData) {
-    return <LoadingPage />;
-  }
+  if (authLoading || loadingData) return <LoadingPage />;
 
-  // If fetching is done and there's still no profile, they need to onboard
   if (!artisanProfile) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex items-center justify-center">
@@ -153,7 +150,7 @@ export default function ArtisanDashboard() {
   const stats = {
     totalListings: listings.length,
     totalOrders: orders.length,
-    totalRevenue: orders.reduce((sum, order) => sum + Number.parseInt(order.amount.replace("₹", "")), 0),
+    totalRevenue: orders.reduce((sum, order) => sum + parseInt(order.amount.replace("₹", ""), 10), 0),
     avgRating: 4.8,
   };
 
@@ -175,7 +172,6 @@ export default function ArtisanDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
-      {/* Success Message */}
       {showSuccess && (
         <div className="bg-green-500 text-white px-4 py-3 text-center">
           <div className="flex items-center justify-center gap-2">
@@ -186,66 +182,54 @@ export default function ArtisanDashboard() {
       )}
 
       <div className="container mx-auto px-4 py-8">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {artisanProfile.name}! 👋</h1>
-          <p className="text-gray-600">
-            {artisanProfile.craft} artisan from {artisanProfile.region}, {artisanProfile.state}
-          </p>
+          <p className="text-gray-600">{artisanProfile.craft} artisan from {artisanProfile.region}, {artisanProfile.state}</p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="border-orange-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Listings</p>
-                  <p className="text-3xl font-bold text-gray-800">{stats.totalListings}</p>
-                </div>
-                <Package className="w-8 h-8 text-orange-500" />
+            <CardContent className="p-6 flex justify-between items-center">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Listings</p>
+                <p className="text-3xl font-bold text-gray-800">{stats.totalListings}</p>
               </div>
+              <Package className="w-8 h-8 text-orange-500" />
             </CardContent>
           </Card>
-
+          
           <Card className="border-orange-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                  <p className="text-3xl font-bold text-gray-800">{stats.totalOrders}</p>
-                </div>
-                <ShoppingCart className="w-8 h-8 text-green-500" />
+            <CardContent className="p-6 flex justify-between items-center">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Orders</p>
+                <p className="text-3xl font-bold text-gray-800">{stats.totalOrders}</p>
               </div>
+              <ShoppingCart className="w-8 h-8 text-orange-500" />
             </CardContent>
           </Card>
-
+          
           <Card className="border-orange-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                  <p className="text-3xl font-bold text-gray-800">₹{stats.totalRevenue}</p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-blue-500" />
+            <CardContent className="p-6 flex justify-between items-center">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                <p className="text-3xl font-bold text-gray-800">₹{stats.totalRevenue}</p>
               </div>
+              <TrendingUp className="w-8 h-8 text-orange-500" />
             </CardContent>
           </Card>
-
+          
           <Card className="border-orange-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Avg Rating</p>
-                  <p className="text-3xl font-bold text-gray-800">{stats.avgRating}</p>
-                </div>
-                <Star className="w-8 h-8 text-yellow-500" />
+            <CardContent className="p-6 flex justify-between items-center">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Avg Rating</p>
+                <p className="text-3xl font-bold text-gray-800">{stats.avgRating}</p>
               </div>
+              <Star className="w-8 h-8 text-orange-500" />
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content */}
         <Tabs defaultValue="listings" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="listings">My Listings</TabsTrigger>
@@ -253,48 +237,36 @@ export default function ArtisanDashboard() {
             <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
 
-          {/* Listings Tab */}
           <TabsContent value="listings" className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-800">My Listings</h2>
-              <Button
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                asChild
-              >
+              <Button asChild className="bg-gradient-to-r from-orange-500 to-red-500">
                 <Link href="/artisan/create-listing">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add New Product
+                  <Plus className="w-4 h-4 mr-2" /> Add New Product
                 </Link>
               </Button>
             </div>
 
             {listings.length === 0 ? (
-              <Card className="border-orange-200">
-                <CardContent className="p-12 text-center">
-                  <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No listings yet</h3>
-                  <p className="text-gray-500 mb-6">Create your first product listing to start selling</p>
-                  <Button
-                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                    asChild
-                  >
-                    <Link href="/artisan/create-listing">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Your First Listing
-                    </Link>
-                  </Button>
-                </CardContent>
+              <Card className="border-orange-200 text-center p-12">
+                <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">No listings yet</h3>
+                <Button asChild className="bg-gradient-to-r from-orange-500 to-red-500">
+                  <Link href="/artisan/create-listing">
+                    <Plus className="w-4 h-4 mr-2" /> Create Your First Listing
+                  </Link>
+                </Button>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {listings.map((listing) => (
-                  <Card key={listing._id} className="border-orange-200 hover:shadow-lg transition-shadow">
+                  <Card key={listing._id} className="hover:shadow-lg">
                     <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                      {listing.images && listing.images[0] ? (
-                        <img
-                          src={listing.images[0] || "/placeholder.svg"}
-                          alt={listing.title}
-                          className="w-full h-full object-cover"
+                      {listing.images?.[0] ? (
+                        <img 
+                          src={listing.images[0]} 
+                          alt={listing.title} 
+                          className="w-full h-full object-cover" 
                         />
                       ) : (
                         <div className="w-full h-full bg-gray-200 flex items-center justify-center">
@@ -306,20 +278,10 @@ export default function ArtisanDashboard() {
                     <CardContent className="p-4">
                       <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{listing.title}</h3>
                       <p className="text-gray-600 text-sm mb-3 line-clamp-2">{listing.description}</p>
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex justify-between mb-4">
                         <span className="text-lg font-bold text-orange-600">{listing.suggestedPrice}</span>
                         <Badge variant="outline">{listing.category}</Badge>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                          <Edit className="w-4 h-4 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -327,44 +289,29 @@ export default function ArtisanDashboard() {
             )}
           </TabsContent>
 
-          {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-800">Recent Orders</h2>
-
             {orders.length === 0 ? (
-              <Card className="border-orange-200">
-                <CardContent className="p-12 text-center">
-                  <ShoppingCart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No orders yet</h3>
-                  <p className="text-gray-500">Orders will appear here once customers start buying your products</p>
-                </CardContent>
+              <Card className="p-12 text-center">
+                <ShoppingCart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-600 mb-2">No orders yet</h3>
               </Card>
             ) : (
               <div className="space-y-4">
-                {orders.map((order) => (
-                  <Card key={order.id} className="border-orange-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-800 mb-1">{order.productTitle}</h3>
-                          <p className="text-gray-600 text-sm mb-2">
-                            Ordered by {order.buyer} • Quantity: {order.quantity}
-                          </p>
-                          <p className="text-gray-500 text-xs">Order Date: {order.date}</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-gray-800">{order.amount}</p>
-                            <div
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
-                            >
-                              {getStatusIcon(order.status)}
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                            </div>
-                          </div>
-                          <Button variant="outline" size="sm">
-                            View Details
-                          </Button>
+                {orders.map((order, index) => (
+                  <Card key={index}>
+                    <CardContent className="p-6 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold text-gray-800">{order.productTitle}</h3>
+                        <p className="text-gray-600 text-sm">
+                          Ordered by {order.buyer} • Quantity: {order.quantity}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold">{order.amount}</p>
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                          {getStatusIcon(order.status)}
+                          {order.status}
                         </div>
                       </div>
                     </CardContent>
@@ -374,16 +321,13 @@ export default function ArtisanDashboard() {
             )}
           </TabsContent>
 
-          {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-800">Profile Settings</h2>
-
-            <Card className="border-orange-200">
+            <Card>
               <CardHeader>
                 <CardTitle>Artisan Information</CardTitle>
-                <CardDescription>Your profile information as shown to buyers</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Name</Label>
@@ -395,9 +339,7 @@ export default function ArtisanDashboard() {
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Location</Label>
-                    <p className="text-gray-800">
-                      {artisanProfile.region}, {artisanProfile.state}
-                    </p>
+                    <p className="text-gray-800">{artisanProfile.region}, {artisanProfile.state}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Language</Label>
@@ -409,22 +351,18 @@ export default function ArtisanDashboard() {
                       <p className="text-gray-800">{artisanProfile.experience} years</p>
                     </div>
                   )}
+                  {artisanProfile.bio && (
+                    <div className="md:col-span-2">
+                      <Label className="text-sm font-medium text-gray-600">About</Label>
+                      <p className="text-gray-800">{artisanProfile.bio}</p>
+                    </div>
+                  )}
                 </div>
-                {artisanProfile.bio && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">About</Label>
-                    <p className="text-gray-800">{artisanProfile.bio}</p>
-                  </div>
-                )}
-                <Button variant="outline" className="mt-4 bg-transparent">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Profile
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
     </div>
-  )
+  );
 }

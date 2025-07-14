@@ -1,7 +1,5 @@
 import { getAuthCookie } from './auth-utils';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
 interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
 }
@@ -38,7 +36,7 @@ export async function apiRequest<T>(
 
   // Ensure the endpoint starts with a slash
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = `${API_BASE_URL}${normalizedEndpoint}`;
+  const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}${normalizedEndpoint}`;
 
   // Prepare headers
   const headers = new Headers(fetchOptions.headers);
@@ -73,7 +71,6 @@ export async function apiRequest<T>(
 export const api = {
   get: <T>(endpoint: string, options?: RequestOptions) =>
     apiRequest<T>(endpoint, { ...options, method: 'GET' }),
-
   post: <T>(endpoint: string, data?: any, options?: RequestOptions) =>
     apiRequest<T>(endpoint, {
       ...options,

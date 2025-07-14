@@ -1,14 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 
 class Listing(BaseModel):
+    _id: str
     title: str
     description: str
-    tags: List[str]
+    images: List[str] = []
+    suggested_price: str = Field(..., alias="suggested_price")
     category: str
-    suggestedPrice: str
-    story: str
-    artisan_id: str
+    artist_id: str = Field(..., alias="artist_id")
     
 class ListingsResponse(BaseModel):
     listings: List[Listing]

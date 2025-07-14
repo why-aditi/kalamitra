@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { api } from "@/lib/api-client";
 import {
   Mic,
   MicOff,
@@ -115,12 +116,11 @@ const generateListing = async () => {
       return;
     }
 
-    const response = await fetch(`/api/create-listing`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-listing`, {
       method: "POST",
       body: formData,
       headers: {
         Authorization: `Bearer ${token}`
-        // Do NOT set Content-Type for FormData; browser will set it with boundary
       },
     });
 
