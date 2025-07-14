@@ -15,7 +15,7 @@ def serialize_artisan_doc(artisan_doc: dict) -> dict:
 
 router = APIRouter()
 
-@router.post("/onboarding", response_model=ArtisanProfileResponse)
+@router.post("/artist/onboarding", response_model=ArtisanProfileResponse)
 async def complete_artisan_onboarding(
     onboarding_data: ArtisanOnboardingData,
     current_user: dict = Depends(get_current_user)
@@ -43,21 +43,21 @@ async def complete_artisan_onboarding(
         db = Database.get_db()
         
         # Check if artisan profile already exists
-        existing_profile = await db["artisan_profiles"].find_one({"firebase_uid": current_user["firebase_uid"]})
+        existing_profile = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
         
         if existing_profile:
             # Update existing profile
-            result = await db["artisan_profiles"].update_one(
+            result = await db["users"].update_one(
                 {"firebase_uid": current_user["firebase_uid"]},
                 {"$set": artisan_profile.model_dump(by_alias=True, exclude={"id", "created_at"})}
             )
-            updated_profile = await db["artisan_profiles"].find_one({"firebase_uid": current_user["firebase_uid"]})
+            updated_profile = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
             serialized_profile = serialize_artisan_doc(updated_profile)
             return ArtisanProfileResponse(**serialized_profile)
         else:
             # Create new profile
-            result = await db["artisan_profiles"].insert_one(artisan_profile.model_dump(by_alias=True))
-            created_profile = await db["artisan_profiles"].find_one({"_id": result.inserted_id})
+            result = await db["users"].insert_one(artisan_profile.model_dump(by_alias=True))
+            created_profile = await db["users"].find_one({"_id": result.inserted_id})
             serialized_profile = serialize_artisan_doc(created_profile)
             return ArtisanProfileResponse(**serialized_profile)
         
@@ -69,7 +69,7 @@ async def complete_artisan_onboarding(
             detail="Failed to save artisan profile"
         )
 
-@router.get("/me", response_model=ArtistProfile)
+@router.get("/artist/me", response_model=ArtistProfile)
 async def get_artist_profile(current_user: dict = Depends(check_artist_role)):
     try:
         user = auth.get_user(current_user["uid"])
@@ -90,7 +90,7 @@ async def get_artist_profile(current_user: dict = Depends(check_artist_role)):
             detail="Artist not found"
         )
 
-@router.put("/me", response_model=ArtistProfile)
+@router.put("/artist/me", response_model=ArtistProfile)
 async def update_artist_profile(
     profile_update: ArtistProfileUpdate,
     current_user: dict = Depends(check_artist_role)

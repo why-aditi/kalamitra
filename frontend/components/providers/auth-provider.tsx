@@ -23,6 +23,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  revalidateProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,11 +33,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchAppUserProfile = useCallback(async (firebaseUser: User) => {
+    try {
+      const idToken = await firebaseUser.getIdToken(true); // Force refresh
+      localStorage.setItem('accessToken', idToken);
+      
+      // --- IMPORTANT CHANGE ---
+      // Call /api/me which returns the full user profile, not /verify-token
+      const userProfile = await api.get<UserProfile>('/api/me');
+      
+      setProfile(userProfile);
+    } catch (error) {
+      console.error("Failed to fetch user profile:", error);
+      // If this fails, the session is invalid.
+      await signOutUser(); // This will trigger onAuthStateChanged to clear state
+    }
+  }, []);
+
+  const handleAuthStateChange = useCallback(async (firebaseUser: User | null) => {
+    if (firebaseUser) {
+      setUser(firebaseUser);
+      await fetchAppUserProfile(firebaseUser);
+    } else {
+      localStorage.removeItem('accessToken');
+      setUser(null);
+      setProfile(null);
+    }
+    setLoading(false);
+  }, [fetchAppUserProfile]);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(handleAuthStateChange);
+    return () => unsubscribe();
+  }, [handleAuthStateChange]);
+
   const handleUserSession = useCallback(async (firebaseUser: User | null) => {
     if (firebaseUser) {
       try {
-        // --- KEY FIX STARTS HERE ---
-        // 1. Get the ID Token from the Firebase user object.
         const idToken = await firebaseUser.getIdToken();
 
         // 2. Store this token in localStorage so your api-client can find it.
@@ -86,8 +119,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // onAuthStateChanged will clear the session
   };
 
+  const revalidateProfile = async () => {
+           const firebaseUser = auth.currentUser;
+           if (firebaseUser) {
+             setLoading(true); // Show loading state during re-fetch
+             await fetchAppUserProfile(firebaseUser);
+             setLoading(false);
+           }
+         };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, revalidateProfile }}>
       <AuthRedirectHandler>{children}</AuthRedirectHandler>
     </AuthContext.Provider>
   );
@@ -129,7 +171,7 @@ function AuthRedirectHandler({ children }: { children: React.ReactNode }) {
         }
         return;
       }
-  
+      
       if (profile.role) {
         if (isAuthRoute || isOnboarding) {
           const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/buyer/profile';

@@ -17,7 +17,7 @@ import { api } from "@/lib/api-client"
 
 export default function ArtisanOnboarding() {
   const router = useRouter()
-  const { user } = useAuthContext()
+  const { user, revalidateProfile } = useAuthContext()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -46,9 +46,12 @@ export default function ArtisanOnboarding() {
     setLoading(true)
     try {
       // Save artisan profile to database
-      await api.post('/api/onboarding', formData)
+      await api.post('/api/artist/onboarding', formData)
       
       // Redirect to dashboard
+      if (revalidateProfile) {
+        await revalidateProfile();
+      }
       router.push("/artisan/dashboard")
     } catch (error) {
       console.error('Error saving artisan profile:', error)
@@ -289,6 +292,7 @@ export default function ArtisanOnboarding() {
                     type="submit"
                     disabled={loading}
                     className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                    onClick={handleSubmit}
                   >
                     {loading ? "Saving..." : "Complete Setup"}
                   </Button>
