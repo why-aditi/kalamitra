@@ -12,9 +12,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Heart, User, MapPin, Palette, Languages } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useAuthContext } from "@/components/providers/auth-provider"
+import { api } from "@/lib/api-client"
 
 export default function ArtisanOnboarding() {
   const router = useRouter()
+  const { user } = useAuthContext()
+  const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     craft: "",
@@ -25,11 +29,33 @@ export default function ArtisanOnboarding() {
     bio: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Store artisan data (in real app, this would go to a database)
-    localStorage.setItem("artisan_profile", JSON.stringify(formData))
-    router.push("/artisan/dashboard")
+    
+    if (!user) {
+      router.push('/buyer/login')
+      return
+    }
+
+    // Validate required fields
+    if (!formData.name || !formData.craft || !formData.state) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Save artisan profile to database
+      await api.post('/api/artists/onboarding', formData)
+      
+      // Redirect to dashboard
+      router.push("/artisan/dashboard")
+    } catch (error) {
+      console.error('Error saving artisan profile:', error)
+      alert('Failed to save profile. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const states = [
@@ -278,9 +304,10 @@ export default function ArtisanOnboarding() {
                   </Button>
                   <Button
                     type="submit"
+                    disabled={loading}
                     className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
                   >
-                    Complete Setup
+                    {loading ? "Saving..." : "Complete Setup"}
                   </Button>
                 </div>
               </form>

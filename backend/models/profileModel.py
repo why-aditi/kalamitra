@@ -12,3 +12,7 @@ class UserProfileUpdate(BaseModel):
     phone_number: str = None
     address: str = None
     profile_picture: str = None
+    
+
+class RoleUpdate(BaseModel):
+    role: str

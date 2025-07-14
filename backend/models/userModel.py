@@ -21,15 +21,15 @@ class PyObjectId(ObjectId):
 class UserBase(BaseModel):
     email: EmailStr
     display_name: str
-    role: str = "user"
+    role: Optional[str] = None
     is_active: bool = True
 
 class UserDB(UserBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-    firebase_uid: str  # This was missing!
+    firebase_uid: str  
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-
+    role: Optional[str] = None
     class Config:
         validate_by_name = True
         arbitrary_types_allowed = True

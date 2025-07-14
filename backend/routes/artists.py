@@ -2,9 +2,72 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from firebase_admin import auth
 from typing import List, Optional
 from .auth import get_current_user, check_artist_role
-from models.artistModel import ArtistProfile, ArtistProfileUpdate
+from models.artistModel import ArtistProfile, ArtistProfileUpdate, ArtisanOnboardingData, ArtisanProfileDB, ArtisanProfileResponse
+from services.database import Database
+
+def serialize_artisan_doc(artisan_doc: dict) -> dict:
+    """Helper function to serialize MongoDB document for Pydantic models"""
+    if artisan_doc:
+        # Convert ObjectId to string
+        artisan_doc["_id"] = str(artisan_doc["_id"])
+        return artisan_doc
+    return None
 
 router = APIRouter()
+
+@router.post("/onboarding", response_model=ArtisanProfileResponse)
+async def complete_artisan_onboarding(
+    onboarding_data: ArtisanOnboardingData,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        # Check if user role is artisan
+        if current_user.get("role") != "artisan":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only artisans can complete onboarding"
+            )
+        
+        # Create artisan profile in MongoDB
+        artisan_profile = ArtisanProfileDB(
+            firebase_uid=current_user["firebase_uid"],
+            name=onboarding_data.name,
+            craft=onboarding_data.craft,
+            region=onboarding_data.region,
+            state=onboarding_data.state,
+            language=onboarding_data.language,
+            experience=onboarding_data.experience,
+            bio=onboarding_data.bio
+        )
+        
+        db = Database.get_db()
+        
+        # Check if artisan profile already exists
+        existing_profile = await db["artisan_profiles"].find_one({"firebase_uid": current_user["firebase_uid"]})
+        
+        if existing_profile:
+            # Update existing profile
+            result = await db["artisan_profiles"].update_one(
+                {"firebase_uid": current_user["firebase_uid"]},
+                {"$set": artisan_profile.model_dump(by_alias=True, exclude={"id", "created_at"})}
+            )
+            updated_profile = await db["artisan_profiles"].find_one({"firebase_uid": current_user["firebase_uid"]})
+            serialized_profile = serialize_artisan_doc(updated_profile)
+            return ArtisanProfileResponse(**serialized_profile)
+        else:
+            # Create new profile
+            result = await db["artisan_profiles"].insert_one(artisan_profile.model_dump(by_alias=True))
+            created_profile = await db["artisan_profiles"].find_one({"_id": result.inserted_id})
+            serialized_profile = serialize_artisan_doc(created_profile)
+            return ArtisanProfileResponse(**serialized_profile)
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save artisan profile"
+        )
 
 @router.get("/me", response_model=ArtistProfile)
 async def get_artist_profile(current_user: dict = Depends(check_artist_role)):

@@ -1,20 +1,26 @@
+// src/components/providers/auth-provider.tsx
+
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User } from 'firebase/auth';
+import { useRouter, usePathname } from 'next/navigation';
 import { auth, signInWithGoogle, signOutUser } from '@/lib/firebase';
-import { getAuthCookie, isTokenExpired, refreshAuthToken } from '@/lib/auth-utils';
+import { api } from '@/lib/api-client';
+import { LoadingPage } from '@/components/ui/loading';
 
-// Example user profile type — adjust fields as per your backend response
 type UserProfile = {
-  role: string;
+  _id: string;
+  firebase_uid: string;
+  email: string;
+  display_name: string;
+  role: 'artisan' | 'buyer' | 'admin' | null;
 };
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
-  error: Error | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -25,93 +31,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
 
-  const refreshToken = useCallback(async (firebaseUser: User) => {
-    try {
-      const token = getAuthCookie();
-      if (token && isTokenExpired(token)) {
-        const newToken = await refreshAuthToken(firebaseUser);
-        return newToken;
-      }
-      return token;
-    } catch (error) {
-      console.error('Token refresh error:', error);
-      throw error;
-    }
-  }, []);
+  const handleUserSession = useCallback(async (firebaseUser: User | null) => {
+    if (firebaseUser) {
+      try {
+        // --- KEY FIX STARTS HERE ---
+        // 1. Get the ID Token from the Firebase user object.
+        const idToken = await firebaseUser.getIdToken();
 
-  const fetchUserProfile = async (token: string): Promise<UserProfile> => {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/user/profile`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+        // 2. Store this token in localStorage so your api-client can find it.
+        localStorage.setItem('accessToken', idToken);
+        // --- KEY FIX ENDS HERE ---
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch user profile');
-    }
-    return await response.json();
-  };
-
-  const handleAuthStateChange = useCallback(async (firebaseUser: User | null) => {
-    try {
-      if (firebaseUser) {
-        const token = await refreshToken(firebaseUser);
-        if (token) {
-          const userProfile = await fetchUserProfile(token);
-          setUser(firebaseUser);
-          setProfile(userProfile);
-        }
-      } else {
+        // 3. Now, call your backend. The api-client will find the token.
+        const userProfile = await api.post<UserProfile>('/api/verify-token');
+        
+        setUser(firebaseUser);
+        setProfile(userProfile);
+      } catch (error) {
+        console.error("Failed to verify user and fetch profile:", error);
+        localStorage.removeItem('accessToken'); // Clean up on failure
+        await signOutUser();
         setUser(null);
         setProfile(null);
-        localStorage.removeItem('auth-token'); // You can replace this with removeAuthCookie if needed
       }
-    } catch (error) {
-      console.error('Auth state change error:', error);
-      setError(error instanceof Error ? error : new Error('Authentication error'));
-    } finally {
-      setLoading(false);
+    } else {
+      // No Firebase user, clear everything
+      localStorage.removeItem('accessToken');
+      setUser(null);
+      setProfile(null);
     }
-  }, [refreshToken]);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(handleAuthStateChange, (error) => {
-      console.error('Auth state change error:', error);
-      setError(error);
-      setLoading(false);
-    });
-
+    const unsubscribe = auth.onAuthStateChanged(handleUserSession);
     return () => unsubscribe();
-  }, [handleAuthStateChange]);
+  }, [handleUserSession]);
 
   const signIn = async () => {
+    setLoading(true);
     try {
-      setError(null);
-      const { user } = await signInWithGoogle();
-      setUser(user);
+      await signInWithGoogle();
+      // onAuthStateChanged will trigger handleUserSession automatically
     } catch (error) {
       console.error('Sign in error:', error);
-      setError(error instanceof Error ? error : new Error('Failed to sign in'));
-      throw error;
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    try {
-      setError(null);
-      await signOutUser();
-      setUser(null);
-      setProfile(null);
-    } catch (error) {
-      console.error('Sign out error:', error);
-      setError(error instanceof Error ? error : new Error('Failed to sign out'));
-      throw error;
-    }
+    setLoading(true);
+    await signOutUser();
+    // onAuthStateChanged will clear the session
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, error, signIn, signOut }}>
-      {children}
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut }}>
+      <AuthRedirectHandler>{children}</AuthRedirectHandler>
     </AuthContext.Provider>
   );
 }
@@ -122,4 +99,48 @@ export function useAuthContext() {
     throw new Error('useAuthContext must be used within an AuthProvider');
   }
   return context;
+}
+
+// This AuthRedirectHandler component remains the same as before.
+// It handles all the client-side routing logic.
+function AuthRedirectHandler({ children }: { children: React.ReactNode }) {
+    const { profile, loading } = useAuthContext();
+    const pathname = usePathname();
+    const router = useRouter();
+  
+    useEffect(() => {
+      if (loading) return;
+  
+      const onboardingRoutes = ['/onboarding/role', '/artisan/onboarding'];
+      const authRoutes = ['/buyer/login'];
+      const isAuthRoute = authRoutes.includes(pathname);
+      const isOnboarding = onboardingRoutes.includes(pathname);
+  
+      if (!profile) {
+        if (!isAuthRoute && !pathname.startsWith('/marketplace') && pathname !== '/') {
+          router.push('/buyer/login');
+        }
+        return;
+      }
+  
+      if (profile.role === null) {
+        if (!isOnboarding) {
+          router.push('/onboarding/role');
+        }
+        return;
+      }
+  
+      if (profile.role) {
+        if (isAuthRoute || isOnboarding) {
+          const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/marketplace';
+          router.push(redirectPath);
+        }
+      }
+    }, [profile, loading, pathname, router]);
+  
+    if (loading) {
+      return <LoadingPage />;
+    }
+  
+    return children;
 }

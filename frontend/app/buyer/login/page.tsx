@@ -13,22 +13,10 @@ export default function BuyerLoginPage() {
   const { user, profile, signIn, loading } = useAuthContext();
   const from = searchParams.get('from') || '/marketplace';
 
-  const getRedirectPath = () => {
-    if (!profile) return from;
-    
-    switch (profile.role) {
-      case 'artisan':
-        return '/artisan/dashboard';
-      case 'admin':
-        return '/admin/dashboard';
-      default:
-        return from;
-    }
-  };
-
   useEffect(() => {
-    if (user && profile) {
-      router.push(getRedirectPath());
+    if (user && profile?.role) {
+        const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/marketplace';
+        router.push(from && from !== '/' ? from : redirectPath);
     }
   }, [user, profile, router, from]);
 

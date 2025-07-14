@@ -63,9 +63,6 @@ async def login_user(user_data: UserLogin):
         # Sign in with Firebase and verify password
         try:
             user_record = auth.get_user_by_email(user_data.email)
-            # Note: Firebase Admin SDK doesn't have sign_in_with_email_and_password
-            # You'll need to use the Firebase Auth REST API or client SDK for this
-            # For now, we'll assume the user exists and is valid
         except firebase_admin.auth.UserNotFoundError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -113,7 +110,6 @@ async def verify_token(authorization: str = Header(...)):
             new_user = UserDB(
                 email=decoded_token.get("email"),
                 display_name=decoded_token.get("name", ""),
-                role="buyer",  # Default role
                 firebase_uid=firebase_uid
             )
             result = await db["users"].insert_one(new_user.model_dump(by_alias=True))
@@ -159,3 +155,13 @@ async def check_artist_role(current_user: dict = Depends(get_current_user)):
             detail="Only artists can access this endpoint"
         )
     return current_user
+
+@router.patch("/update-role", response_model=UserResponse)
+async def update_role(new_role: str, current_user: dict = Depends(get_current_user)):
+    db = Database.get_db()
+    await db["users"].update_one(
+        {"firebase_uid": current_user["firebase_uid"]},
+        {"$set": {"role": new_role, "updated_at": datetime.utcnow()}}
+    )
+    updated_user = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
+    return UserResponse(**serialize_user_doc(updated_user))
