@@ -9,3 +9,9 @@ class Listing(BaseModel):
     suggestedPrice: str
     story: str
     artisan_id: str
+    
+class ListingsResponse(BaseModel):
+    listings: List[Listing]
+    total: int
+    limit: int
+    skip: int

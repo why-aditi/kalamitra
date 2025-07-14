@@ -48,15 +48,19 @@ class ArtisanProfileDB(BaseModel):
 class ArtisanProfileResponse(BaseModel):
     id: str = Field(alias="_id")
     firebase_uid: str
-    name: str
-    craft: str
+    name: Optional[str] = None
+    craft: Optional[str] = None
     region: Optional[str] = None
-    state: str
+    state: Optional[str] = None
     language: Optional[str] = None
     experience: Optional[str] = None
     bio: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        validate_by_name = True
+        json_encoders = {ObjectId: str}
 
     class Config:
         validate_by_name = True

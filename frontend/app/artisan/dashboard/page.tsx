@@ -40,7 +40,7 @@ interface ArtisanProfile {
 }
 
 interface ListingsResponse {
-  listings: Listing[];
+  listings: Listing[] | [];
   total: number;
   limit: number;
   skip: number;

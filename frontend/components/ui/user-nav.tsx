@@ -25,33 +25,29 @@ export function UserNav() {
   const getRoleBasedLinks = () => {
     if (!profile) return [];
 
-    const commonLinks = [
-      { href: `/${profile.role}/profile`, label: 'Profile' },
-    ];
-
     switch (profile.role) {
       case 'artisan':
         return [
-          ...commonLinks,
+          { href: "/artisan/profile", label: 'Profile' },
           { href: '/artisan/dashboard', label: 'Dashboard' },
           { href: '/artisan/products', label: 'My Products' },
           { href: '/artisan/orders', label: 'Orders' },
         ];
       case 'user':
         return [
-          ...commonLinks,
+          { href: "/buyer/profile", label: 'Profile' },,
           { href: '/buyer/orders', label: 'My Orders' },
         ];
       case 'admin':
         return [
-          ...commonLinks,
+          { href: "/admin/profile", label: 'Profile' },
           { href: '/admin/dashboard', label: 'Dashboard' },
           { href: '/admin/users', label: 'Users' },
           { href: '/admin/products', label: 'Products' },
           { href: '/admin/orders', label: 'Orders' },
         ];
       default:
-        return commonLinks;
+        return [];
     }
   };
 
