@@ -30,7 +30,7 @@ export default function BuyerProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const data = await api.get<UserProfile>('api/users/profile');
+        const data = await api.get<UserProfile>('api/me');
         setProfile(data);
       } catch (error) {
         console.error('Error fetching profile:', error);

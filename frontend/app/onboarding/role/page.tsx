@@ -24,7 +24,7 @@ export default function RoleSelectionPage() {
     setLoading(true)
     try {
       // Update user role in backend
-      await api.put('/api/users/role', { role })
+      await api.put('/api/role', { role })
       
       // Redirect based on role
       if (role === 'user') {

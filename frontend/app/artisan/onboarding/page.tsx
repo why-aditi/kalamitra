@@ -46,7 +46,7 @@ export default function ArtisanOnboarding() {
     setLoading(true)
     try {
       // Save artisan profile to database
-      await api.post('/api/artists/onboarding', formData)
+      await api.post('/api/onboarding', formData)
       
       // Redirect to dashboard
       router.push("/artisan/dashboard")
@@ -126,23 +126,6 @@ export default function ArtisanOnboarding() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
-                <Heart className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                KalaMitra
-              </span>
-            </div>
-          </Link>
-        </div>
-      </header>
-
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">

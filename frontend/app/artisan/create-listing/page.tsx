@@ -165,26 +165,6 @@ const publishListing = async () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/artisan/dashboard" className="flex items-center space-x-2">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
-                <Heart className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                KalaMitra
-              </span>
-            </div>
-          </Link>
-          <div className="text-sm text-gray-600">
-            Step {currentStep} of {steps.length}
-          </div>
-        </div>
-      </header>
-
       <div className="container mx-auto px-4 py-8">
         {/* Progress Steps */}
         <div className="max-w-4xl mx-auto mb-8">

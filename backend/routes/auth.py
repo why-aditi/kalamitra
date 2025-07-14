@@ -6,8 +6,11 @@ from datetime import datetime
 from services.database import Database
 from models.userModel import UserLogin, TokenResponse, UserCreate, UserDB, UserResponse
 import firebase_admin.auth
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 router = APIRouter()
+oauth2_scheme = HTTPBearer()
+
 
 def serialize_user_doc(user_doc: dict) -> dict:
     """Helper function to serialize MongoDB document for Pydantic models"""
@@ -127,26 +130,33 @@ async def verify_token(authorization: str = Header(...)):
         )
 
 # Dependency for protected routes
-async def get_current_user(token: str):
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)) -> dict:
+    """
+    Dependency to get the current user from the provided bearer token.
+    Verifies the Firebase ID token and fetches the user profile from MongoDB.
+    """
     try:
+        token = credentials.credentials
         decoded_token = auth.verify_id_token(token)
-        user_db = await Database.get_db()["users"].find_one({"firebase_uid": decoded_token["uid"]})
-        
-        if not user_db:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found in database"
-            )
-        
-        # Serialize the document
-        return serialize_user_doc(user_db)
-        
+        uid = decoded_token.get("uid")
+        if not uid:
+            raise HTTPException(status_code=401, detail="Invalid token claims")
+
+        db = Database.get_db()
+        user_doc = await db["users"].find_one({"firebase_uid": uid})
+
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found in database")
+
+        return serialize_user_doc(user_doc)
     except Exception as e:
+        print(f"Auth error: {e}") # Add logging for easier debugging
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-
+        
 # Dependency for role-based access
 async def check_artist_role(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "artist":
