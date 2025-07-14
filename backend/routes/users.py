@@ -6,6 +6,7 @@ from .auth import get_current_user
 from models.profileModel import UserProfile, UserProfileUpdate, RoleUpdate
 from models.userModel import UserDB
 from services.database import Database
+from datetime import datetime
 
 
 router = APIRouter()
@@ -40,90 +41,80 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
             detail="Could not find 'firebase_uid' in the user session data."
         )
 
-
-@router.put("/me", response_model=UserProfile)
-async def update_user_profile(profile_update: UserProfileUpdate, current_user: dict = Depends(get_current_user)):
-    try:
-        # Update user in Firebase
-        update_kwargs = {}
-        if profile_update.display_name:
-            update_kwargs["display_name"] = profile_update.display_name
-        if profile_update.phone_number:
-            update_kwargs["phone_number"] = profile_update.phone_number
-        if profile_update.profile_picture:
-            update_kwargs["photo_url"] = profile_update.profile_picture
-
-        user = auth.update_user(
-            current_user["uid"],
-            **update_kwargs
-        )
-
-        return UserProfile(
-            display_name=user.display_name,
-            email=user.email,
-            phone_number=user.phone_number,
-            address=profile_update.address,  # This would need to be stored in your database
-            profile_picture=user.photo_url
-        )
-    except auth.UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-
-@router.put("/role")
-async def update_user_role(role_update: RoleUpdate, current_user: dict = Depends(get_current_user)):
+@router.patch("/me", response_model=UserProfile, tags=["Users & Profile"])
+async def update_user_profile(
+    profile_update: UserProfileUpdate, 
+    current_user: dict = Depends(get_current_user)
+):
     """
-    Updates the role for the currently authenticated user.
+    Partially updates the current user's profile information in both
+    Firebase for auth-related fields and MongoDB for custom data.
     """
-    try:
-        # The role from the request body
-        new_role = role_update.role
+    # Use the correct key 'firebase_uid' from the dependency
+    firebase_uid = current_user["firebase_uid"]
+    
+    mongo_update = {"updated_at": datetime.utcnow()}
+    firebase_update = {}
 
-        # Validate role
-        valid_roles = ["user", "artisan", "buyer"]
-        if new_role not in valid_roles:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}"
-            )
+    if profile_update.display_name is not None:
+        mongo_update["display_name"] = profile_update.display_name
+        firebase_update["display_name"] = profile_update.display_name
+    
+    if profile_update.phone_number is not None:
+        firebase_update["phone_number"] = profile_update.phone_number
         
-        # Get the user's Firebase UID from the token
-        firebase_uid = current_user["firebase_uid"]
+    if profile_update.profile_picture is not None:
+        firebase_update["photo_url"] = profile_update.profile_picture
         
-        # Update role in Firebase custom claims
-        auth.set_custom_user_claims(firebase_uid, {"role": new_role})
-        
-        # Update role in MongoDB
+    if profile_update.address is not None:
+        mongo_update["address"] = profile_update.address
+
+    try:
+        if firebase_update:
+            auth.update_user(firebase_uid, **firebase_update)
+
         db = Database.get_db()
-        result = await db["users"].update_one(
+        await db["users"].update_one(
             {"firebase_uid": firebase_uid},
-            {"$set": {"role": new_role}}
+            {"$set": mongo_update}
         )
-        
-        if result.matched_count == 0:
-            # This case should be rare since get_current_user already found the user
-            raise HTTPException(status_code=404, detail="User not found in database for update")
-        
-        return {"message": "Role updated successfully", "role": new_role}
-        
+
+        # Fetch and return the fully updated profile
+        updated_user_doc = await db["users"].find_one({"firebase_uid": firebase_uid})
+        return await get_current_user_profile(updated_user_doc)
+
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        # Provide more specific error logging on the server
-        print(f"Failed to update role: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while updating the user role."
-        )
-        
-@router.delete("/me")
+        print(f"Error updating profile for {firebase_uid}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update user profile.")
+
+
+@router.put("/role", tags=["Users & Profile"])
+async def update_user_role(role_update: RoleUpdate, current_user: dict = Depends(get_current_user)):
+    # This endpoint is correct and does not need changes.
+    firebase_uid = current_user["firebase_uid"]
+    new_role = role_update.role
+    valid_roles = ["user", "artisan", "buyer"]
+    if new_role not in valid_roles:
+        raise HTTPException(status_code=400, detail="Invalid role.")
+    
+    auth.set_custom_user_claims(firebase_uid, {"role": new_role})
+    db = Database.get_db()
+    await db["users"].update_one(
+        {"firebase_uid": firebase_uid},
+        {"$set": {"role": new_role, "updated_at": datetime.utcnow()}}
+    )
+    return {"message": "Role updated successfully", "role": new_role}
+
+
+@router.delete("/me", tags=["Users & Profile"])
 async def delete_user_account(current_user: dict = Depends(get_current_user)):
+    # This endpoint also needs to use the correct key
+    firebase_uid = current_user["firebase_uid"]
     try:
-        auth.delete_user(current_user["uid"])
+        auth.delete_user(firebase_uid)
+        db = Database.get_db()
+        await db["users"].delete_one({"firebase_uid": firebase_uid})
         return {"message": "User account successfully deleted"}
-    except auth.UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    except Exception as e:
+        print(f"Error deleting user {firebase_uid}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete user account.")

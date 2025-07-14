@@ -132,7 +132,7 @@ function AuthRedirectHandler({ children }: { children: React.ReactNode }) {
   
       if (profile.role) {
         if (isAuthRoute || isOnboarding) {
-          const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/marketplace';
+          const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/buyer/profile';
           router.push(redirectPath);
         }
       }

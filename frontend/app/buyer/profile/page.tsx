@@ -13,7 +13,7 @@ import { EditProfileForm } from '@/components/forms/edit-profile-form';
 interface UserProfile {
   _id: string;
   email: string;
-  name: string;
+  display_name: string;
   photoURL?: string;
   phone?: string;
   address?: string;
@@ -27,19 +27,19 @@ export default function BuyerProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const data = await api.get<UserProfile>('api/me');
-        setProfile(data);
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        setError('Failed to load profile');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchProfile = async () => {
+    try {
+      const data = await api.get<UserProfile>('api/me');
+      setProfile(data);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setError('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (user) {
       fetchProfile();
     }
@@ -75,11 +75,11 @@ export default function BuyerProfilePage() {
           <div className="space-y-8">
             <div className="flex items-center space-x-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={profile.photoURL || user?.photoURL || ''} alt={profile.name} />
-                <AvatarFallback>{profile.name[0]}</AvatarFallback>
+                <AvatarImage src={profile.photoURL || user?.photoURL || ''} alt={profile.display_name} />
+                <AvatarFallback>{profile.display_name[0]}</AvatarFallback>
               </Avatar>
               <div>
-                <h2 className="text-2xl font-bold">{profile.name}</h2>
+                <h2 className="text-2xl font-bold">{profile.display_name}</h2>
                 <p className="text-muted-foreground">{profile.email}</p>
               </div>
             </div>
@@ -110,7 +110,7 @@ export default function BuyerProfilePage() {
             {isEditing ? (
               <EditProfileForm
                 initialData={{
-                  name: profile.name,
+                  name: profile.display_name,
                   phone: profile.phone,
                   address: profile.address,
                 }}

@@ -15,8 +15,8 @@ export default function BuyerLoginPage() {
 
   useEffect(() => {
     if (user && profile?.role) {
-        const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/marketplace';
-        router.push(from && from !== '/' ? from : redirectPath);
+        const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/buyer/profile';
+        router.push(redirectPath);
     }
   }, [user, profile, router, from]);
 

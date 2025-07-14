@@ -39,7 +39,7 @@ export function EditProfileForm({
     setLoading(true);
 
     try {
-      await api.patch('api/users/profile', formData);
+      await api.patch('api/me', formData);
       
       toast({
         title: 'Success',
