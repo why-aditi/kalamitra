@@ -568,7 +568,29 @@ export default function Marketplace() {
                                   </Badge>
                                   <Button
                                     className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 text-sm font-semibold shadow"
-                                    onClick={() => alert('Buy Now functionality coming soon!')}
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-checkout-session`, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            product: {
+                                              title: product.title,
+                                              description: product.description,
+                                              price: product.price,
+                                            }
+                                          })
+                                        });
+                                        const data = await res.json();
+                                        if (data.url) {
+                                          window.location.href = data.url;
+                                        } else {
+                                          alert('Failed to initiate payment.');
+                                        }
+                                      } catch (err) {
+                                        alert('Error connecting to payment gateway.');
+                                      }
+                                    }}
                                   >
                                     Buy Now
                                   </Button>
