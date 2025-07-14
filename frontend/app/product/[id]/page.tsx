@@ -41,7 +41,7 @@ export default function ProductDetail() {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [orderForm, setOrderForm] = useState({
     name: "",
-    phone: "",
+    phone_number: "",
     address: "",
     paymentMethod: "cod",
   })
@@ -332,11 +332,11 @@ export default function ProductDetail() {
                           />
                         </div>
                         <div>
-                          <Label htmlFor="phone">Phone Number *</Label>
+                          <Label htmlFor="phone_number">Phone Number *</Label>
                           <Input
-                            id="phone"
-                            value={orderForm.phone}
-                            onChange={(e) => setOrderForm({ ...orderForm, phone: e.target.value })}
+                            id="phone_number"
+                            value={orderForm.phone_number}
+                            onChange={(e) => setOrderForm({ ...orderForm, phone_number: e.target.value })}
                             placeholder="Enter your phone number"
                             required
                           />
@@ -376,7 +376,7 @@ export default function ProductDetail() {
                       <Button
                         onClick={handleOrder}
                         className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-                        disabled={!orderForm.name || !orderForm.phone || !orderForm.address}
+                        disabled={!orderForm.name || !orderForm.phone_number || !orderForm.address}
                       >
                         Confirm Order - ₹{product.price * quantity}
                       </Button>

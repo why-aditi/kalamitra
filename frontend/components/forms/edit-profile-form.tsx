@@ -9,15 +9,15 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProfileFormData {
-  name: string;
-  phone?: string;
+  display_name: string;
+  phone_number?: string;
   address?: string;
 }
 
 interface EditProfileFormProps {
   initialData: {
-    name: string;
-    phone?: string;
+    display_name: string;
+    phone_number?: string;
     address?: string;
   };
   onSuccess?: () => void;
@@ -29,7 +29,11 @@ export function EditProfileForm({
   onSuccess,
   onCancel,
 }: EditProfileFormProps) {
-  const [formData, setFormData] = useState<ProfileFormData>(initialData);
+  const [formData, setFormData] = useState<ProfileFormData>({
+  display_name: initialData.display_name,  
+  phone_number: initialData.phone_number,
+  address: initialData.address,
+});
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -63,22 +67,22 @@ export function EditProfileForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="name">Name</Label>
+        <Label htmlFor="display_name">Name</Label>
         <Input
           id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          value={formData.display_name}
+          onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
           required
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="phone">Phone Number</Label>
+        <Label htmlFor="phone_number">Phone Number</Label>
         <Input
-          id="phone"
+          id="phone_number"
           type="tel"
-          value={formData.phone || ''}
-          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+          value={formData.phone_number || ''}
+          onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
           placeholder="Optional"
         />
       </div>

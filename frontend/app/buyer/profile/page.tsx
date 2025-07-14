@@ -15,7 +15,7 @@ interface UserProfile {
   email: string;
   display_name: string;
   photoURL?: string;
-  phone?: string;
+  phone_number?: string;
   address?: string;
   created_at: Date;
 }
@@ -67,8 +67,8 @@ export default function BuyerProfilePage() {
   }
 
   return (
-    <div className="container mx-auto py-10">
-      <Card>
+    <div className="py-16 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
+      <Card className="max-w-lg mx-auto p-1 bg-white shadow-md rounded-lg">
         <CardHeader>
           <CardTitle>Profile</CardTitle>
         </CardHeader>
@@ -89,7 +89,7 @@ export default function BuyerProfilePage() {
               <div className="space-y-2">
                 <Label>Phone Number</Label>
                 <p className="text-muted-foreground">
-                  {profile.phone || 'Not provided'}
+                  {profile.phone_number || 'Not provided'}
                 </p>
               </div>
 
@@ -111,8 +111,8 @@ export default function BuyerProfilePage() {
             {isEditing ? (
               <EditProfileForm
                 initialData={{
-                  name: profile.display_name,
-                  phone: profile.phone,
+                  display_name: profile.display_name,
+                  phone_number: profile.phone_number,
                   address: profile.address,
                 }}
                 onSuccess={() => {

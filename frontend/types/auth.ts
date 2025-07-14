@@ -6,7 +6,7 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   photoURL?: string;
-  phone?: string;
+  phone_number?: string;
   address?: string;
   createdAt: string;
   updatedAt: string;

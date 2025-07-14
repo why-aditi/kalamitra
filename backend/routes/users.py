@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from firebase_admin import auth
 from typing import List
 from pydantic import BaseModel
 from .auth import get_current_user
@@ -7,7 +6,6 @@ from models.profileModel import UserProfile, UserProfileUpdate, RoleUpdate
 from models.userModel import UserDB
 from services.database import Database
 from datetime import datetime
-
 
 router = APIRouter()
 
@@ -54,25 +52,20 @@ async def update_user_profile(
     firebase_uid = current_user["firebase_uid"]
     
     mongo_update = {"updated_at": datetime.utcnow()}
-    firebase_update = {}
-
+    
     if profile_update.display_name is not None:
         mongo_update["display_name"] = profile_update.display_name
-        firebase_update["display_name"] = profile_update.display_name
     
     if profile_update.phone_number is not None:
-        firebase_update["phone_number"] = profile_update.phone_number
+        mongo_update["phone_number"] = profile_update.phone_number
         
     if profile_update.profile_picture is not None:
-        firebase_update["photo_url"] = profile_update.profile_picture
+        mongo_update["photo_url"] = profile_update.profile_picture
         
     if profile_update.address is not None:
         mongo_update["address"] = profile_update.address
 
     try:
-        if firebase_update:
-            auth.update_user(firebase_uid, **firebase_update)
-
         db = Database.get_db()
         await db["users"].update_one(
             {"firebase_uid": firebase_uid},
@@ -97,7 +90,6 @@ async def update_user_role(role_update: RoleUpdate, current_user: dict = Depends
     if new_role not in valid_roles:
         raise HTTPException(status_code=400, detail="Invalid role.")
     
-    auth.set_custom_user_claims(firebase_uid, {"role": new_role})
     db = Database.get_db()
     await db["users"].update_one(
         {"firebase_uid": firebase_uid},
@@ -111,7 +103,6 @@ async def delete_user_account(current_user: dict = Depends(get_current_user)):
     # This endpoint also needs to use the correct key
     firebase_uid = current_user["firebase_uid"]
     try:
-        auth.delete_user(firebase_uid)
         db = Database.get_db()
         await db["users"].delete_one({"firebase_uid": firebase_uid})
         return {"message": "User account successfully deleted"}
