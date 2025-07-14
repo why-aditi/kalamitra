@@ -352,4 +352,29 @@ export default function OrderTracking() {
                                   Track Order
                                 </Button>
                               )}
-                              <Button variant="outline" size="sm\
+                                                            <Button variant="outline" size="sm">
+                                <MessageCircle className="w-4 h-4 mr-1" />
+                                Contact Artisan
+                              </Button>
+                              {order.status === 'delivered' && (
+                                <Button variant="outline" size="sm">
+                                  <Star className="w-4 h-4 mr-1" />
+                                  Rate & Review
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
+      </div>
+    </div>
+  )
+}
+
