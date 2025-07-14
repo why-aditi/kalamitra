@@ -14,25 +14,25 @@ router = APIRouter()
 @router.get("/me", response_model=UserProfile)
 async def get_current_user_profile(current_user: dict = Depends(get_current_user)):
     try:
-        # --- THIS IS THE FIX ---
-        # Use the correct key "firebase_uid" which exists in your database document.
         firebase_uid = current_user["firebase_uid"]
         
-        # Fetch the user from Firebase using the correct UID.
-        user = auth.get_user(firebase_uid)
+        
+        db = Database.get_db()
+        user = await db["users"].find_one({"firebase_uid": firebase_uid})
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
         
         return UserProfile(
-            display_name=user.display_name,
-            email=user.email,
-            phone_number=user.phone_number,
-            # Get address from your DB document if it exists
-            address=current_user.get("address"), 
-            profile_picture=user.photo_url
-        )
-    except auth.UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found in Firebase"
+            display_name=user.get("display_name"),
+            email=user.get("email"),
+            phone_number=user.get("phone_number"),
+            role=user.get("role"),
+            address=user.get("address"), 
+            profile_picture=user.get("profile_picture")
         )
     except KeyError:
         # This is a good safeguard

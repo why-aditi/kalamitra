@@ -159,7 +159,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(o
         
 # Dependency for role-based access
 async def check_artist_role(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "artist":
+    if current_user["role"] != "artisan":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only artists can access this endpoint"

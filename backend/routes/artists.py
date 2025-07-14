@@ -43,7 +43,7 @@ async def complete_artisan_onboarding(
         db = Database.get_db()
         
         # Check if artisan profile already exists
-        existing_profile = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
+        existing_profile = await db["users"].find_one({"firebase_uid": current_user["uid"]})
         
         if existing_profile:
             # Update existing profile
@@ -69,25 +69,36 @@ async def complete_artisan_onboarding(
             detail="Failed to save artisan profile"
         )
 
-@router.get("/artist/me", response_model=ArtistProfile)
+# In your FastAPI router file
+
+@router.get("/artist/me", response_model=ArtisanProfileResponse) # Use the more detailed response model
 async def get_artist_profile(current_user: dict = Depends(check_artist_role)):
     try:
-        user = auth.get_user(current_user["uid"])
-        return ArtistProfile(
-            display_name=user.display_name,
-            email=user.email,
-            phone_number=user.phone_number,
-            profile_picture=user.photo_url,
-            # Additional fields would need to be fetched from your database
-            bio=None,
-            specialization=None,
-            portfolio_url=None,
-            years_of_experience=None
-        )
+        db = Database.get_db()
+        # Fetch the artisan's profile from your MongoDB collection
+        artisan_profile_doc = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
+
+        if not artisan_profile_doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Artisan profile not found in database. Please complete onboarding."
+            )
+
+        # Serialize the document to make it compatible with the Pydantic model
+        serialized_profile = serialize_artisan_doc(artisan_profile_doc)
+        return ArtisanProfileResponse(**serialized_profile)
+
     except auth.UserNotFoundError:
+        # This case might be redundant if check_artist_role already handles it
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Artist not found"
+            detail="Artist not found in Firebase."
+        )
+    except Exception as e:
+        # General error handler
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
         )
 
 @router.put("/artist/me", response_model=ArtistProfile)

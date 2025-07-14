@@ -37,16 +37,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const idToken = await firebaseUser.getIdToken(true); // Force refresh
       localStorage.setItem('accessToken', idToken);
-      
-      // --- IMPORTANT CHANGE ---
-      // Call /api/me which returns the full user profile, not /verify-token
       const userProfile = await api.get<UserProfile>('/api/me');
-      
       setProfile(userProfile);
     } catch (error) {
       console.error("Failed to fetch user profile:", error);
-      // If this fails, the session is invalid.
-      await signOutUser(); // This will trigger onAuthStateChanged to clear state
+      await signOutUser(); 
     }
   }, []);
 
@@ -71,25 +66,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (firebaseUser) {
       try {
         const idToken = await firebaseUser.getIdToken();
-
-        // 2. Store this token in localStorage so your api-client can find it.
         localStorage.setItem('accessToken', idToken);
-        // --- KEY FIX ENDS HERE ---
-
-        // 3. Now, call your backend. The api-client will find the token.
         const userProfile = await api.post<UserProfile>('/api/verify-token');
-        
         setUser(firebaseUser);
         setProfile(userProfile);
       } catch (error) {
         console.error("Failed to verify user and fetch profile:", error);
-        localStorage.removeItem('accessToken'); // Clean up on failure
+        localStorage.removeItem('accessToken'); 
         await signOutUser();
         setUser(null);
         setProfile(null);
       }
     } else {
-      // No Firebase user, clear everything
       localStorage.removeItem('accessToken');
       setUser(null);
       setProfile(null);

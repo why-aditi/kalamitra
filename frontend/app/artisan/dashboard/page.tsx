@@ -1,14 +1,19 @@
 "use client"
 
-import { Label } from "@/components/ui/label"
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useAuthContext } from "@/components/providers/auth-provider";
+import { api } from "@/lib/api-client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+// Import your UI components
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoadingPage } from "@/components/ui/loading";
+import { Label } from "@/components/ui/label";
 import {
-  Heart,
   Plus,
   Eye,
   Edit,
@@ -19,144 +24,154 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-} from "lucide-react"
-import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+  Heart,
+} from "lucide-react";
+
+// --- Define Types for your data for better type safety ---
+interface ArtisanProfile {
+  id: string;
+  name: string;
+  craft: string;
+  region: string;
+  state: string;
+  language: string;
+  experience?: string;
+  bio?: string;
+}
+
+interface Listing {
+  _id: string;
+  title: string;
+  description: string;
+  images: string[];
+  suggestedPrice: string;
+  category: string;
+}
+
+interface Order {
+  id: number;
+  productTitle: string;
+  buyer: string;
+  amount: string;
+  status: string;
+  date: string;
+  quantity: number;
+}
 
 export default function ArtisanDashboard() {
-  const searchParams = useSearchParams()
-  const [artisan, setArtisan] = useState<any>(null)
-  const [listings, setListings] = useState<any[]>([])
-  const [orders, setOrders] = useState<any[]>([])
-  const [showSuccess, setShowSuccess] = useState(false)
+  const searchParams = useSearchParams();
+  const { profile: authProfile, loading: authLoading } = useAuthContext();
+
+  const [artisanProfile, setArtisanProfile] = useState<ArtisanProfile | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
-    // Load artisan profile
-    const profile = localStorage.getItem("artisan_profile")
-    if (profile) {
-      setArtisan(JSON.parse(profile))
-    }
+    const fetchData = async () => {
+      if (authProfile && authProfile.role === 'artisan') {
+        setLoadingData(true);
+        try {
+          // Fetch profile and listings in parallel
+          const [profileResponse, listingsResponse] = await Promise.all([
+            api.get<ArtisanProfile>('/api/artist/me'),
+            api.get<Listing[]>('/api/listings')
+          ]);
 
-    // Load listings
-    const savedListings = localStorage.getItem("artisan_listings")
-    if (savedListings) {
-      setListings(JSON.parse(savedListings))
-    }
+          console.log("Fetched Artisan Profile:", profileResponse);
+          console.log("Fetched Listings Response:", listingsResponse);
+          
+          setArtisanProfile(profileResponse);
+          
+          // Handle listings response - ensure it's an array
+          if (Array.isArray(listingsResponse)) {
+            setListings(listingsResponse);
+          } else if (listingsResponse && Array.isArray(listingsResponse)) {
+            // If the response is wrapped in a data property
+            setListings(listingsResponse);
+          } else {
+            console.warn("Listings response is not an array:", listingsResponse);
+            setListings([]); // Fallback to empty array
+          }
 
-    // Load orders (mock data)
-    setOrders([
-      {
-        id: 1,
-        productTitle: "Handcrafted Rajasthani Clay Diya Set",
-        buyer: "Priya Sharma",
-        amount: "₹299",
-        status: "pending",
-        date: "2024-01-15",
-        quantity: 2,
-      },
-      {
-        id: 2,
-        productTitle: "Traditional Pottery Vase",
-        buyer: "Amit Kumar",
-        amount: "₹599",
-        status: "confirmed",
-        date: "2024-01-14",
-        quantity: 1,
-      },
-    ])
+          // Mock orders for now, can be replaced with a real API call
+          setOrders([
+            { id: 1, productTitle: "Handcrafted Clay Diya", buyer: "Priya S.", amount: "₹299", status: "pending", date: "2024-01-15", quantity: 2 },
+            { id: 2, productTitle: "Pottery Vase", buyer: "Amit K.", amount: "₹599", status: "confirmed", date: "2024-01-14", quantity: 1 },
+          ]);
 
-    // Show success message if redirected from create listing
+        } catch (error) {
+          console.error("Failed to fetch artisan dashboard data:", error);
+          // Ensure listings is always an array even on error
+          setListings([]);
+        } finally {
+          setLoadingData(false);
+        }
+      } else if (!authLoading) {
+        // If auth is done and user is not an artisan, stop loading
+        setLoadingData(false);
+      }
+    };
+
+    fetchData();
+
     if (searchParams.get("success") === "true") {
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 5000)
+      setShowSuccess(true);
+      const timer = setTimeout(() => setShowSuccess(false), 5000);
+      return () => clearTimeout(timer);
     }
-  }, [searchParams])
+  }, [authProfile, authLoading, searchParams]);
+
+  // Show a loading screen while authentication or data fetching is in progress
+  if (authLoading || loadingData) {
+    return <LoadingPage />;
+  }
+
+  // If fetching is done and there's still no profile, they need to onboard
+  if (!artisanProfile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle>Welcome to KalaMitra</CardTitle>
+            <CardDescription>Please complete your artisan profile to get started.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button className="w-full bg-orange-500 hover:bg-orange-600" asChild>
+              <Link href="/artisan/onboarding">Complete Profile</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const stats = {
     totalListings: listings.length,
     totalOrders: orders.length,
     totalRevenue: orders.reduce((sum, order) => sum + Number.parseInt(order.amount.replace("₹", "")), 0),
     avgRating: 4.8,
-  }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "confirmed":
-        return "bg-green-100 text-green-800"
-      case "shipped":
-        return "bg-blue-100 text-blue-800"
-      case "delivered":
-        return "bg-purple-100 text-purple-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+      case "pending": return "bg-yellow-100 text-yellow-800";
+      case "confirmed": return "bg-green-100 text-green-800";
+      default: return "bg-gray-100 text-gray-800";
     }
-  }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "pending":
-        return <Clock className="w-4 h-4" />
-      case "confirmed":
-        return <CheckCircle className="w-4 h-4" />
-      case "shipped":
-        return <Package className="w-4 h-4" />
-      case "delivered":
-        return <CheckCircle className="w-4 h-4" />
-      default:
-        return <AlertCircle className="w-4 h-4" />
+      case "pending": return <Clock className="w-4 h-4" />;
+      case "confirmed": return <CheckCircle className="w-4 h-4" />;
+      default: return <AlertCircle className="w-4 h-4" />;
     }
-  }
-
-  if (!artisan) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle>Welcome to KalaMitra</CardTitle>
-            <CardDescription>Please complete your profile to get started</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" asChild>
-              <Link href="/artisan/onboarding">Complete Profile</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
-              <Heart className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-              KalaMitra
-            </span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" asChild>
-              <Link href="/marketplace">View Marketplace</Link>
-            </Button>
-            <Button
-              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-              asChild
-            >
-              <Link href="/artisan/create-listing">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Listing
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-
       {/* Success Message */}
       {showSuccess && (
         <div className="bg-green-500 text-white px-4 py-3 text-center">
@@ -170,9 +185,9 @@ export default function ArtisanDashboard() {
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {artisan.name}! 👋</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {artisanProfile.name}! 👋</h1>
           <p className="text-gray-600">
-            {artisan.craft} artisan from {artisan.region}, {artisan.state}
+            {artisanProfile.craft} artisan from {artisanProfile.region}, {artisanProfile.state}
           </p>
         </div>
 
@@ -270,7 +285,7 @@ export default function ArtisanDashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {listings.map((listing) => (
-                  <Card key={listing.id} className="border-orange-200 hover:shadow-lg transition-shadow">
+                  <Card key={listing._id} className="border-orange-200 hover:shadow-lg transition-shadow">
                     <div className="aspect-square relative overflow-hidden rounded-t-lg">
                       {listing.images && listing.images[0] ? (
                         <img
@@ -369,33 +384,33 @@ export default function ArtisanDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Name</Label>
-                    <p className="text-gray-800">{artisan.name}</p>
+                    <p className="text-gray-800">{artisanProfile.name}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Craft</Label>
-                    <p className="text-gray-800">{artisan.craft}</p>
+                    <p className="text-gray-800">{artisanProfile.craft}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Location</Label>
                     <p className="text-gray-800">
-                      {artisan.region}, {artisan.state}
+                      {artisanProfile.region}, {artisanProfile.state}
                     </p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Language</Label>
-                    <p className="text-gray-800">{artisan.language}</p>
+                    <p className="text-gray-800">{artisanProfile.language}</p>
                   </div>
-                  {artisan.experience && (
+                  {artisanProfile.experience && (
                     <div>
                       <Label className="text-sm font-medium text-gray-600">Experience</Label>
-                      <p className="text-gray-800">{artisan.experience} years</p>
+                      <p className="text-gray-800">{artisanProfile.experience} years</p>
                     </div>
                   )}
                 </div>
-                {artisan.bio && (
+                {artisanProfile.bio && (
                   <div>
                     <Label className="text-sm font-medium text-gray-600">About</Label>
-                    <p className="text-gray-800">{artisan.bio}</p>
+                    <p className="text-gray-800">{artisanProfile.bio}</p>
                   </div>
                 )}
                 <Button variant="outline" className="mt-4 bg-transparent">

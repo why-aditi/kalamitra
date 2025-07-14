@@ -1,7 +1,6 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getAnalytics, isSupported } from 'firebase/analytics';
-import { setAuthCookie, removeAuthCookie } from './auth-utils';
 import { api } from './api-client';
 import { AuthUser, UserProfile } from '@/types/auth';
 
@@ -49,15 +48,10 @@ export const signInWithGoogle = async () => {
       { requiresAuth: true }
     );
 
-    // Store user profile in localStorage
-    localStorage.setItem('userProfile', JSON.stringify(response.user));
-
     return { user, profile: response.user };
   } catch (error) {
     console.error('Error signing in with Google:', error);
     localStorage.removeItem('accessToken');
-    localStorage.removeItem('userProfile');
-    removeAuthCookie();
     throw error;
   }
 };
@@ -70,8 +64,6 @@ export const signOutUser = async () => {
     console.error('Error signing out:', error);
   } finally {
     localStorage.removeItem('accessToken');
-    localStorage.removeItem('userProfile');
-    removeAuthCookie();
   }
 };
 
