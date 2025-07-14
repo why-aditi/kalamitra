@@ -259,8 +259,8 @@ export default function ArtisanDashboard() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {listings.map((listing) => (
-                  <Card key={listing._id} className="hover:shadow-lg">
+                {listings.map((listing, index) => (
+                  <Card key={listing._id || `listing-${index}`} className="hover:shadow-lg">
                     <div className="aspect-square relative overflow-hidden rounded-t-lg">
                       {listing.images?.[0] ? (
                         <img 
@@ -298,8 +298,8 @@ export default function ArtisanDashboard() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {orders.map((order, index) => (
-                  <Card key={index}>
+                {orders.map((order) => (
+                  <Card key={order.id}>
                     <CardContent className="p-6 flex justify-between items-center">
                       <div>
                         <h3 className="font-semibold text-gray-800">{order.productTitle}</h3>

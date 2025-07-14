@@ -71,8 +71,8 @@ export default function ArtisanProducts() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {listings.map((listing) => (
-              <Card key={listing._id} className="border-orange-200 hover:shadow-lg transition-shadow">
+            {listings.map((listing, index) => (
+              <Card key={listing._id || `listing-${index}`} className="hover:shadow-lg">
                 <div className="aspect-square relative overflow-hidden rounded-t-lg">
                   {listing.images && listing.images[0] ? (
                     <img
