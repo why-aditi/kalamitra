@@ -44,7 +44,7 @@ async def complete_artisan_onboarding(
         db = Database.get_db()
         
         # Check if artisan profile already exists
-        existing_profile = await db["users"].find_one({"firebase_uid": current_user["uid"]})
+        existing_profile = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
         
         if existing_profile:
             # Update existing profile

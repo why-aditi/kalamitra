@@ -17,7 +17,7 @@ interface UserProfile {
   photoURL?: string;
   phone?: string;
   address?: string;
-  createdAt: string;
+  created_at: Date;
 }
 
 export default function BuyerProfilePage() {
@@ -30,6 +30,7 @@ export default function BuyerProfilePage() {
   const fetchProfile = async () => {
     try {
       const data = await api.get<UserProfile>('api/me');
+      console.log(data);
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -102,7 +103,7 @@ export default function BuyerProfilePage() {
               <div className="space-y-2">
                 <Label>Member Since</Label>
                 <p className="text-muted-foreground">
-                  {new Date(profile.createdAt).toLocaleDateString()}
+                  {new Date(profile.created_at).toLocaleDateString()}
                 </p>
               </div>
             </div>

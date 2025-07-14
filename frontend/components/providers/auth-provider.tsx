@@ -1,5 +1,3 @@
-// src/components/providers/auth-provider.tsx
-
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
@@ -14,7 +12,7 @@ type UserProfile = {
   firebase_uid: string;
   email: string;
   display_name: string;
-  role: 'artisan' | 'buyer' | 'admin' | null;
+  role: 'artisan' | 'user' | 'admin' | null;
 };
 
 interface AuthContextType {

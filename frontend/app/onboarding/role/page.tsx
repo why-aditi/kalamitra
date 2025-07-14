@@ -11,7 +11,7 @@ import { api } from "@/lib/api-client"
 
 export default function RoleSelectionPage() {
   const router = useRouter()
-  const { user } = useAuthContext()
+  const { user, revalidateProfile } = useAuthContext()
   const [loading, setLoading] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string | null>(null)
 
@@ -25,6 +25,7 @@ export default function RoleSelectionPage() {
     try {
       // Update user role in backend
       await api.put('/api/role', { role })
+      await revalidateProfile();
       
       // Redirect based on role
       if (role === 'user') {
