@@ -122,29 +122,6 @@ export default function OrderTracking() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/marketplace" className="flex items-center space-x-2">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
-                <Heart className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                KalaMitra
-              </span>
-            </div>
-          </Link>
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/marketplace" className="text-gray-600 hover:text-orange-600 transition-colors">
-              Browse
-            </Link>
-            <Button variant="outline">Sign In</Button>
-          </nav>
-        </div>
-      </header>
-
       <div className="container mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="mb-8">
