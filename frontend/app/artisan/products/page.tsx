@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, Eye, Edit } from "lucide-react";
 import Link from "next/link";
@@ -13,7 +13,9 @@ interface Listing {
   suggestedPrice: string;
   category: string;
   images?: string[];
+  image_ids?: string[]; // Include optional fallback field
 }
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export default function ArtisanProducts() {
@@ -21,7 +23,6 @@ export default function ArtisanProducts() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch the artisan's listings from the backend
     const fetchListings = async () => {
       try {
         const token = localStorage.getItem("accessToken");
@@ -30,10 +31,10 @@ export default function ArtisanProducts() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-      });
+        });
         if (!res.ok) throw new Error("Failed to fetch listings");
         const data = await res.json();
-        setListings(data.listings || data || []);
+        setListings(data.listings || []);
       } catch (err) {
         setListings([]);
       } finally {
@@ -54,6 +55,7 @@ export default function ArtisanProducts() {
             </Link>
           </Button>
         </div>
+
         {loading ? (
           <div className="text-center text-gray-500 py-20">Loading...</div>
         ) : listings.length === 0 ? (
@@ -71,39 +73,40 @@ export default function ArtisanProducts() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {listings.map((listing, index) => (
-              <Card key={listing._id || `listing-${index}`} className="hover:shadow-lg">
-                <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                  {listing.images && listing.images[0] ? (
+            {listings.map((listing, index) => {
+              const firstImageId = listing.images?.[0] || listing.image_ids?.[0];
+              const imageUrl = firstImageId
+                ? `${BASE_URL}/api/listings/${listing._id}/images/${firstImageId}`
+                : "/placeholder.svg";
+
+              return (
+                <Card key={listing._id || `listing-${index}`} className="hover:shadow-lg">
+                  <div className="aspect-square relative overflow-hidden rounded-t-lg">
                     <img
-                      src={listing.images[0] || "/placeholder.svg"}
+                      src={imageUrl}
                       alt={listing.title}
                       className="w-full h-full object-cover"
                     />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                      <Package className="w-12 h-12 text-gray-400" />
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{listing.title}</h3>
+                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{listing.description}</p>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-lg font-bold text-orange-600">{listing.suggestedPrice}</span>
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">{listing.category}</span>
                     </div>
-                  )}
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{listing.title}</h3>
-                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">{listing.description}</p>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-lg font-bold text-orange-600">{listing.suggestedPrice}</span>
-                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">{listing.category}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                      <Eye className="w-4 h-4 mr-1" /> View
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                      <Edit className="w-4 h-4 mr-1" /> Edit
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                        <Eye className="w-4 h-4 mr-1" /> View
+                      </Button>
+                      <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                        <Edit className="w-4 h-4 mr-1" /> Edit
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
