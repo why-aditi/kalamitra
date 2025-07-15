@@ -11,35 +11,38 @@ import { api } from "@/lib/api-client"
 
 export default function RoleSelectionPage() {
   const router = useRouter()
-  const { user, revalidateProfile } = useAuthContext()
+  const { profile, revalidateProfile } = useAuthContext()
   const [loading, setLoading] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string | null>(null)
 
   const handleRoleSelection = async (role: string) => {
-    if (!user) {
-      router.push('/buyer/login')
-      return
+  if (!profile) {
+    router.push('/buyer/login');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    await api.put('/api/role', { role });
+
+    // Don't await revalidateProfile immediately.
+    // Navigate right away based on role selection.
+    if (role === 'user') {
+      router.push('/buyer/profile');
+    } else if (role === 'artisan') {
+      router.push('/artisan/onboarding');
     }
 
-    setLoading(true)
-    try {
-      // Update user role in backend
-      await api.put('/api/role', { role })
-      await revalidateProfile();
-      
-      // Redirect based on role
-      if (role === 'user') {
-        router.push('/buyer/profile')
-      } else if (role === 'artisan') {
-        router.push('/artisan/onboarding')
-      }
-    } catch (error) {
-      console.error('Error updating role:', error)
-      // Handle error - maybe show a toast
-    } finally {
-      setLoading(false)
-    }
+    // Optionally revalidate silently after redirect is triggered:
+    revalidateProfile();
+
+  } catch (error) {
+    console.error('Error updating role:', error);
+  } finally {
+    setLoading(false);
   }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">

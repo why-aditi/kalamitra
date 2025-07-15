@@ -7,13 +7,16 @@ import { auth, signInWithGoogle, signOutUser } from '@/lib/firebase';
 import { api } from '@/lib/api-client';
 import { LoadingPage } from '@/components/ui/loading';
 
-type UserProfile = {
-  _id: string;
-  firebase_uid: string;
-  email: string;
+interface UserProfile {
   display_name: string;
-  role: 'artisan' | 'user' | 'admin' | null;
-};
+  email: string;
+  phone_number?: string;
+  role: string | null;
+  address?: string;
+  created_at?: string;
+  is_active?: boolean;
+  is_onboarded?: boolean;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -31,68 +34,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchAppUserProfile = useCallback(async (firebaseUser: User) => {
+  // Unified function to fetch the user profile from your backend
+  const fetchAndSetProfile = useCallback(async (firebaseUser: User) => {
     try {
-      const idToken = await firebaseUser.getIdToken(true); // Force refresh
+      const idToken = await firebaseUser.getIdToken(true);
       localStorage.setItem('accessToken', idToken);
       const userProfile = await api.get<UserProfile>('/api/me');
       setProfile(userProfile);
     } catch (error) {
       console.error("Failed to fetch user profile:", error);
-      await signOutUser(); 
+      await signOutUser();
+      setProfile(null);
+      setUser(null);
+      localStorage.removeItem('accessToken');
     }
   }, []);
 
-  const handleAuthStateChange = useCallback(async (firebaseUser: User | null) => {
-    if (firebaseUser) {
-      setUser(firebaseUser);
-      await fetchAppUserProfile(firebaseUser);
-    } else {
-      localStorage.removeItem('accessToken');
-      setUser(null);
-      setProfile(null);
-    }
-    setLoading(false);
-  }, [fetchAppUserProfile]);
-
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(handleAuthStateChange);
-    return () => unsubscribe();
-  }, [handleAuthStateChange]);
-
-  const handleUserSession = useCallback(async (firebaseUser: User | null) => {
-    if (firebaseUser) {
-      try {
-        const idToken = await firebaseUser.getIdToken();
-        localStorage.setItem('accessToken', idToken);
-        const userProfile = await api.post<UserProfile>('/api/verify-token');
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      setLoading(true);
+      if (firebaseUser) {
         setUser(firebaseUser);
-        setProfile(userProfile);
-      } catch (error) {
-        console.error("Failed to verify user and fetch profile:", error);
-        localStorage.removeItem('accessToken'); 
-        await signOutUser();
+        await fetchAndSetProfile(firebaseUser);
+      } else {
         setUser(null);
         setProfile(null);
+        localStorage.removeItem('accessToken');
       }
-    } else {
-      localStorage.removeItem('accessToken');
-      setUser(null);
-      setProfile(null);
-    }
-    setLoading(false);
-  }, []);
+      setLoading(false);
+    });
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(handleUserSession);
     return () => unsubscribe();
-  }, [handleUserSession]);
+  }, [fetchAndSetProfile]);
 
   const signIn = async () => {
     setLoading(true);
     try {
       await signInWithGoogle();
-      // onAuthStateChanged will trigger handleUserSession automatically
     } catch (error) {
       console.error('Sign in error:', error);
       setLoading(false);
@@ -102,17 +80,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     setLoading(true);
     await signOutUser();
-    // onAuthStateChanged will clear the session
   };
 
   const revalidateProfile = async () => {
-           const firebaseUser = auth.currentUser;
-           if (firebaseUser) {
-             setLoading(true); // Show loading state during re-fetch
-             await fetchAppUserProfile(firebaseUser);
-             setLoading(false);
-           }
-         };
+    try {
+      setLoading(true);
+      const userProfile = await api.get<UserProfile>('/api/me');
+      setProfile(userProfile);
+    } catch (error) {
+      console.error("Failed to revalidate profile:", error);
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, revalidateProfile }}>
@@ -129,46 +110,59 @@ export function useAuthContext() {
   return context;
 }
 
-// This AuthRedirectHandler component remains the same as before.
-// It handles all the client-side routing logic.
 function AuthRedirectHandler({ children }: { children: React.ReactNode }) {
-    const { profile, loading } = useAuthContext();
-    const pathname = usePathname();
-    const router = useRouter();
-  
-    useEffect(() => {
-      if (loading) return;
-  
-      const onboardingRoutes = ['/onboarding/role', '/artisan/onboarding'];
-      const authRoutes = ['/buyer/login'];
-      const isAuthRoute = authRoutes.includes(pathname);
-      const isOnboarding = onboardingRoutes.includes(pathname);
-  
-      if (!profile) {
-        if (!isAuthRoute && !pathname.startsWith('/marketplace') && pathname !== '/') {
-          router.push('/buyer/login');
-        }
-        return;
+  const { profile, loading } = useAuthContext();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    const onboardingRoutes = ['/onboarding/role', '/artisan/onboarding'];
+    const authRoutes = ['/buyer/login'];
+    const isAuthRoute = authRoutes.includes(pathname);
+    const isOnboarding = onboardingRoutes.includes(pathname);
+
+    // If user is not logged in, redirect to login page
+    if (!profile) {
+      if (!isAuthRoute && !pathname.startsWith('/marketplace') && pathname !== '/') {
+        router.push('/buyer/login');
       }
-  
-      if (profile.role === null) {
-        if (!isOnboarding) {
-          router.push('/onboarding/role');
-        }
-        return;
-      }
-      
-      if (profile.role) {
-        if (isAuthRoute || isOnboarding) {
-          const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/buyer/profile';
-          router.push(redirectPath);
-        }
-      }
-    }, [profile, loading, pathname, router]);
-  
-    if (loading) {
-      return <LoadingPage />;
+      return;
     }
-  
-    return children;
+
+    // *** FIX STARTS HERE ***
+
+    // If user is logged in but has no role, redirect to role selection
+    if (!profile.role) {
+      if (pathname !== '/onboarding/role') {
+        router.push('/onboarding/role');
+      }
+      return; // Important to return here
+    }
+
+    // *** FIX ENDS HERE ***
+
+
+    // If user has a role, handle redirects based on their role and onboarding status
+    if (profile.role === 'artisan' && !profile.is_onboarded) {
+      if (!pathname.startsWith('/artisan/onboarding')) {
+        router.push('/artisan/onboarding');
+      }
+      return;
+    }
+
+    // If user is on an auth or onboarding route but is already fully set up, redirect them away
+    if (isAuthRoute || isOnboarding) {
+      const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/buyer/profile';
+      router.push(redirectPath);
+    }
+
+  }, [profile, loading, pathname, router]);
+
+  if (loading) {
+    return <LoadingPage />;
+  }
+
+  return <>{children}</>;
 }

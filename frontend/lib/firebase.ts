@@ -43,7 +43,6 @@ export const signInWithGoogle = async () => {
       {
         name: user.displayName,
         email: user.email,
-        photoURL: user.photoURL,
       },
       { requiresAuth: true }
     );

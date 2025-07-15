@@ -1,24 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { useAuthContext } from '@/components/providers/auth-provider';
 import { LoadingPage } from '@/components/ui/loading';
 
 export default function BuyerLoginPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user, profile, signIn, loading } = useAuthContext();
-  const from = searchParams.get('from') || '/marketplace';
-
-  useEffect(() => {
-    if (user && profile?.role) {
-        const redirectPath = profile.role === 'artisan' ? '/artisan/dashboard' : '/buyer/profile';
-        router.push(redirectPath);
-    }
-  }, [user, profile, router, from]);
+  const { profile, signIn, loading } = useAuthContext();
 
   const handleGoogleSignIn = async () => {
     try {
@@ -28,9 +16,10 @@ export default function BuyerLoginPage() {
     }
   };
 
-  if (loading) {
+  if (loading || profile) {
     return <LoadingPage />;
   }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">

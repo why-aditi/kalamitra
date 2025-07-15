@@ -7,8 +7,11 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
+    domains: ["lh3.googleusercontent.com"],
+  },
+  images: {
     unoptimized: true,
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

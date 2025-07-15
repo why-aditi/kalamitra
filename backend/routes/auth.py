@@ -113,7 +113,7 @@ async def verify_token(authorization: str = Header(...)):
             new_user = UserDB(
                 email=decoded_token.get("email"),
                 display_name=decoded_token.get("name", ""),
-                firebase_uid=firebase_uid
+                firebase_uid=firebase_uid,
             )
             result = await db["users"].insert_one(new_user.model_dump(by_alias=True))
             user_db = await db["users"].find_one({"_id": result.inserted_id})

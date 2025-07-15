@@ -30,7 +30,7 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
             phone_number=user.get("phone_number"),
             role=user.get("role"),
             address=user.get("address"), 
-            profile_picture=user.get("profile_picture")
+            is_onboarded=user.get("is_onboarded")
         )
     except KeyError:
         # This is a good safeguard
@@ -58,9 +58,6 @@ async def update_user_profile(
     
     if profile_update.phone_number is not None:
         mongo_update["phone_number"] = profile_update.phone_number
-        
-    if profile_update.profile_picture is not None:
-        mongo_update["photo_url"] = profile_update.profile_picture
         
     if profile_update.address is not None:
         mongo_update["address"] = profile_update.address

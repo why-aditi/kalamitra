@@ -39,6 +39,8 @@ class ArtisanProfileDB(BaseModel):
     bio: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_onboarded: Optional[bool] = False
+
 
     class Config:
         validate_by_name = True
@@ -74,8 +76,7 @@ class ArtistProfile(BaseModel):
     bio: Optional[str] = None
     specialization: Optional[str] = None
     portfolio_url: Optional[str] = None
-    profile_picture: Optional[str] = None
-    years_of_experience: Optional[int] = None
+    years_of_experience: Optional[str] = None
 
 class ArtistProfileUpdate(BaseModel):
     display_name: Optional[str] = None
@@ -83,5 +84,4 @@ class ArtistProfileUpdate(BaseModel):
     bio: Optional[str] = None
     specialization: Optional[str] = None
     portfolio_url: Optional[str] = None
-    profile_picture: Optional[str] = None
-    years_of_experience: Optional[int] = None
+    years_of_experience: Optional[str] = None

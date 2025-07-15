@@ -21,6 +21,7 @@ async def complete_artisan_onboarding(
     onboarding_data: ArtisanOnboardingData,
     current_user: dict = Depends(get_current_user)
 ):
+    print(onboarding_data)
     try:
         # Check if user role is artisan
         if current_user.get("role") != "artisan":
@@ -43,24 +44,33 @@ async def complete_artisan_onboarding(
         
         db = Database.get_db()
         
-        # Check if artisan profile already exists
         existing_profile = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
-        
+
         if existing_profile:
-            # Update existing profile
-            result = await db["users"].update_one(
+            await db["users"].update_one(
                 {"firebase_uid": current_user["firebase_uid"]},
-                {"$set": artisan_profile.model_dump(by_alias=True, exclude={"id", "created_at"})}
+                {
+                    "$set": {
+                        **artisan_profile.model_dump(by_alias=True, exclude={"id", "created_at"}),
+                        "is_onboarded": True
+                    }
+                }
             )
             updated_profile = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
             serialized_profile = serialize_artisan_doc(updated_profile)
             return ArtisanProfileResponse(**serialized_profile)
+
         else:
-            # Create new profile
-            result = await db["users"].insert_one(artisan_profile.model_dump(by_alias=True))
+            result = await db["users"].insert_one(
+                {
+                    **artisan_profile.model_dump(by_alias=True),
+                    "is_onboarded": True
+                }
+            )
             created_profile = await db["users"].find_one({"_id": result.inserted_id})
             serialized_profile = serialize_artisan_doc(created_profile)
             return ArtisanProfileResponse(**serialized_profile)
+
         
     except Exception as e:
         if isinstance(e, HTTPException):
@@ -114,8 +124,6 @@ async def update_artist_profile(
             update_kwargs["display_name"] = profile_update.display_name
         if profile_update.phone_number:
             update_kwargs["phone_number"] = profile_update.phone_number
-        if profile_update.profile_picture:
-            update_kwargs["photo_url"] = profile_update.profile_picture
 
         user = auth.update_user(
             current_user["uid"],
@@ -126,7 +134,6 @@ async def update_artist_profile(
             display_name=user.display_name,
             email=user.email,
             phone_number=user.phone_number,
-            profile_picture=user.photo_url,
             bio=profile_update.bio,
             specialization=profile_update.specialization,
             portfolio_url=profile_update.portfolio_url,
@@ -192,8 +199,6 @@ async def get_public_artist_profile(artist_id: str):
             display_name=user.display_name,
             email=user.email,
             phone_number=user.phone_number,
-            profile_picture=user.photo_url,
-            # Additional fields would need to be fetched from your database
             bio=None,
             specialization=None,
             portfolio_url=None,

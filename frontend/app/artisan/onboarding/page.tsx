@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,49 +17,50 @@ import { api } from "@/lib/api-client"
 
 export default function ArtisanOnboarding() {
   const router = useRouter()
-  const { user, revalidateProfile } = useAuthContext()
+  const { revalidateProfile, profile } = useAuthContext()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     craft: "",
-    region: "",
+    region: "", 
     state: "",
     language: "",
     experience: "",
     bio: "",
   })
+    console.log('RoleSelectionPage rendered with profile:', profile)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!user) {
-      router.push('/buyer/login')
-      return
-    }
-
-    // Validate required fields
-    if (!formData.name || !formData.craft || !formData.state) {
-      alert('Please fill in all required fields')
-      return
-    }
-
-    setLoading(true)
-    try {
-      // Save artisan profile to database
-      await api.post('/api/artist/onboarding', formData)
-      
-      // Redirect to dashboard
-      if (revalidateProfile) {
-        await revalidateProfile();
-      }
-      router.push("/artisan/dashboard")
-    } catch (error) {
-      console.error('Error saving artisan profile:', error)
-      alert('Failed to save profile. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+  if (profile?.role === "artisan" && profile?.is_onboarded) {
+    router.push("/artisan/dashboard");
   }
+}, [profile]);
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (!profile) {
+    router.push("/buyer/login");
+    return;
+  }
+
+  if (!formData.name || !formData.craft || !formData.state) {
+    alert("Please fill in all required fields");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    await api.post("/api/artist/onboarding", formData);
+    await revalidateProfile();
+    router.push("/artisan/dashboard");
+  } catch (error) {
+    console.error("Error saving artisan profile:", error);
+    alert("Failed to save profile. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const states = [
     "Andhra Pradesh",
@@ -292,7 +293,6 @@ export default function ArtisanOnboarding() {
                     type="submit"
                     disabled={loading}
                     className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                    onClick={handleSubmit}
                   >
                     {loading ? "Saving..." : "Complete Setup"}
                   </Button>
