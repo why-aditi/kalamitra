@@ -37,6 +37,7 @@ import { useParams } from "next/navigation"
 export default function ProductDetail() {
   const params = useParams()
   const { user } = useAuthContext()
+  const [imageError, setImageError] = useState(false);
   const [product, setProduct] = useState<any>(null)
   const [selectedImage, setSelectedImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
@@ -203,7 +204,10 @@ export default function ProductDetail() {
               {product.images.map((image: string, index: number) => (
                 <button
                   key={index}
-                  onClick={() => setSelectedImage(index)}
+                  onClick={() => {
+                    setSelectedImage(index);
+                    setImageError(false);
+                  }}
                   className={`aspect-square rounded-lg overflow-hidden border-2 ${selectedImage === index ? "border-orange-500" : "border-gray-200"
                     }`}
                 >
@@ -211,8 +215,12 @@ export default function ProductDetail() {
                     src={image || "/placeholder.svg"}
                     alt={`Product ${index + 1}`}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/placeholder.svg";
+                    }}
                   />
                 </button>
+
               ))}
             </div>
           </div>
@@ -537,3 +545,4 @@ export default function ProductDetail() {
     </div>
   )
 }
+
