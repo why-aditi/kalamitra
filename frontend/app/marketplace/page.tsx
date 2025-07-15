@@ -1,5 +1,6 @@
 "use client"
 
+import { useAuthContext } from "@/components/providers/auth-provider";
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -67,6 +68,7 @@ export default function Marketplace() {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuthContext();
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -77,27 +79,27 @@ export default function Marketplace() {
           throw new Error('Failed to fetch listings');
         }
         const data: ApiResponse = await response.json();
-        
+
         // Transform the API data to match your product structure
         const listings: Product[] = data.listings?.map((listing: ApiListing) => {
           // Handle price - extract numeric value from price string
           const priceStr = listing.suggested_price || "₹299";
           const priceMatch = priceStr.toString().match(/\d+/);
           const price = priceMatch ? parseInt(priceMatch[0], 10) : 299;
-          
+
           return {
             id: listing._id,
             title: listing.title || "Untitled Product",
             description: listing.description || "No description available",
             price: price,
             originalPrice: price + Math.floor(price * 0.2), // 20% higher original price
-            image: listing.image_ids?.[0] 
+            image: listing.image_ids?.[0]
               ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${listing._id}/images/${listing.image_ids[0]}`
               : "/placeholder.svg",
             artisan: {
               name: listing.artist_id?.name || "Traditional Artisan",
-              location: listing.artist_id?.region 
-                ? `${listing.artist_id.region}, ${listing.artist_id.state || "India"}` 
+              location: listing.artist_id?.region
+                ? `${listing.artist_id.region}, ${listing.artist_id.state || "India"}`
                 : "Bihar, India",
               rating: 4.8,
               craft: listing.category || "Art",
@@ -112,7 +114,7 @@ export default function Marketplace() {
             soldCount: Math.floor(Math.random() * 100) + 20,
           };
         }) || [];
-        
+
         setProducts(listings);
         setError(null);
       } catch (err) {
@@ -133,12 +135,12 @@ export default function Marketplace() {
       const urlParams = new URLSearchParams(window.location.search)
       const success = urlParams.get('success')
       const listingId = urlParams.get('listingId')
-      
+
       if (success && listingId) {
         // Remove the query parameters
         const newUrl = window.location.pathname
         window.history.replaceState({}, '', newUrl)
-        
+
         // Highlight the newly published listing
         setTimeout(() => {
           const element = document.getElementById(`product-${listingId}`)
@@ -265,9 +267,8 @@ export default function Marketplace() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${
-                        isVoiceSearch ? "text-red-500 animate-pulse" : "text-gray-400 hover:text-orange-500"
-                      } p-3 rounded-xl`}
+                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isVoiceSearch ? "text-red-500 animate-pulse" : "text-gray-400 hover:text-orange-500"
+                        } p-3 rounded-xl`}
                       onClick={startVoiceSearch}
                       disabled={isVoiceSearch}
                     >
@@ -286,31 +287,31 @@ export default function Marketplace() {
 
                 {/* Quick Filter Tags */}
                 <div className="flex flex-wrap justify-center gap-3 mb-8">
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
                     onClick={() => setSearchQuery("")}
                   >
                     <Sparkles className="w-4 h-4 mr-2" />
                     All
                   </Badge>
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
                     onClick={() => setSearchQuery("madhubani")}
                   >
                     <TrendingUp className="w-4 h-4 mr-2" />
                     Madhubani
                   </Badge>
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
                     onClick={() => setSearchQuery("art")}
                   >
                     Art
                   </Badge>
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
                     onClick={() => setSearchQuery("traditional")}
                   >
@@ -336,12 +337,12 @@ export default function Marketplace() {
                         <label className="text-sm font-semibold text-gray-700 mb-3 block">
                           Price Range: ₹{priceRange[0]} - ₹{priceRange[1]}
                         </label>
-                        <Slider 
-                          value={priceRange} 
-                          onValueChange={setPriceRange} 
-                          max={5000} 
-                          step={100} 
-                          className="w-full" 
+                        <Slider
+                          value={priceRange}
+                          onValueChange={setPriceRange}
+                          max={5000}
+                          step={100}
+                          className="w-full"
                         />
                       </div>
 
@@ -449,9 +450,8 @@ export default function Marketplace() {
                   </Card>
                 ) : (
                   <div
-                    className={`grid gap-8 ${
-                      viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
-                    }`}
+                    className={`grid gap-8 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
+                      }`}
                   >
                     {filteredProducts.map((product) => (
                       <Card
@@ -461,9 +461,8 @@ export default function Marketplace() {
                       >
                         <div className={`${viewMode === "grid" ? "" : "flex"}`}>
                           <div
-                            className={`relative overflow-hidden ${
-                              viewMode === "grid" ? "aspect-square" : "w-64 h-64 flex-shrink-0"
-                            }`}
+                            className={`relative overflow-hidden ${viewMode === "grid" ? "aspect-square" : "w-64 h-64 flex-shrink-0"
+                              }`}
                           >
                             <img
                               src={product.image}
@@ -568,34 +567,20 @@ export default function Marketplace() {
                                   </Badge>
                                   <Button
                                     className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 text-sm font-semibold shadow"
-                                    onClick={async () => {
-                                      try {
-                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-checkout-session`, {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({
-                                            product: {
-                                              title: product.title,
-                                              description: product.description,
-                                              price: product.price,
-                                            }
-                                          })
-                                        });
-                                        const data = await res.json();
-                                        if (data.url) {
-                                          window.location.href = data.url;
-                                        } else {
-                                          alert('Failed to initiate payment.');
-                                        }
-                                      } catch (err) {
-                                        alert('Error connecting to payment gateway.');
+                                    onClick={() => {
+                                      if (!user) {
+                                        window.location.href = "/buyer/login";
+                                        return;
                                       }
+                                      window.location.href = `/product/${product.id}`;
                                     }}
                                   >
                                     Buy Now
                                   </Button>
+
                                 </div>
                               </div>
+
                             </div>
                           </CardContent>
                         </div>

@@ -8,10 +8,14 @@ import Link from "next/link"
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/components/providers/auth-provider';
+import { useState } from 'react';
 
 export default function LandingPage() {
   const { user, profile } = useAuthContext();
   const router = useRouter();
+  const [showVideo, setShowVideo] = useState(false);
+  const handlePlay = () => setShowVideo(true);
+  const handleClose = () => setShowVideo(false);
 
   useEffect(() => {
     if (user) {
@@ -79,10 +83,10 @@ export default function LandingPage() {
               {/* Demo Preview */}
               <div className="relative max-w-4xl mx-auto">
                 <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-orange-200/50">
-                  <div className="aspect-video bg-gradient-to-br from-amber-100 via-orange-100 to-rose-100 rounded-2xl flex items-center justify-center relative overflow-hidden">
+                  <div className="aspect-video bg-gradient-to-br frfom-amber-100 via-orange-100 to-rose-100 rounded-2xl flex items-center justify-center relative overflow-hidden cursor-pointer group" onClick={handlePlay} tabIndex={0} role="button" aria-label="Play KalaMitra Demo Video">
                     <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-rose-500/10"></div>
-                    <div className="text-center z-10">
-                      <div className="w-20 h-20 bg-gradient-to-r from-amber-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                    <div className="text-center z-10 select-none">
+                      <div className="w-20 h-20 bg-gradient-to-r from-amber-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-200">
                         <Play className="w-10 h-10 text-white ml-1" />
                       </div>
                       <h3 className="text-2xl font-bold text-gray-800 mb-3">See KalaMitra in Action</h3>
@@ -93,6 +97,28 @@ export default function LandingPage() {
                     <div className="absolute bottom-6 right-6 w-8 h-8 bg-rose-400/20 rounded-full animate-pulse"></div>
                     <div className="absolute top-1/2 left-8 w-6 h-6 bg-orange-400/20 rounded-full animate-ping"></div>
                   </div>
+                  {/* Video Modal (in-place, fits card) */}
+                  {showVideo && (
+                    <div className="absolute inset-0 z-30 flex items-center justify-center rounded-3xl overflow-hidden">
+                      <div className="relative w-full h-full">
+                        <button
+                          className="absolute top-4 right-4 z-10 bg-gray-100 hover:bg-gray-200 rounded-full p-2 text-gray-700 shadow"
+                          onClick={handleClose}
+                          aria-label="Close video"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                        <iframe
+                          src="https://www.loom.com/embed/0c83b83fa96340638775e0c3dc9b7ce4?sid=e05e694a-70c0-4ad5-bf5d-595b06915685"
+                          frameBorder="0"
+                          allowFullScreen
+                          className="w-full h-full rounded-2xl"
+                          style={{ aspectRatio: '16/9', minHeight: '100%', minWidth: '100%' }}
+                        />
+
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

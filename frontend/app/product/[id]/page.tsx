@@ -1,5 +1,6 @@
 "use client"
 
+import { useAuthContext } from '@/components/providers/auth-provider';
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,6 +36,7 @@ import { useParams } from "next/navigation"
 
 export default function ProductDetail() {
   const params = useParams()
+  const { user } = useAuthContext()
   const [product, setProduct] = useState<any>(null)
   const [selectedImage, setSelectedImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
@@ -120,12 +122,56 @@ export default function ProductDetail() {
     setProduct(mockProduct)
   }, [params.id])
 
-  const handleOrder = () => {
-    // In real app, process the order
-    console.log("Order placed:", { product, quantity, orderForm })
-    setIsOrderModalOpen(false)
-    alert("Order placed successfully! You will receive a confirmation shortly.")
-  }
+  const handleOrder = async () => {
+    if (!user) {
+      alert("Please sign in to continue.");
+      window.location.href = "/buyer/login";
+      return;
+    }
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-checkout-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product: {
+            title: product.title,
+            description: product.description,
+            price: product.price,
+            quantity: quantity,
+          },
+          buyer: {
+            name: orderForm.name,
+            phone_number: orderForm.phone_number,
+            address: orderForm.address,
+            email: user.email,
+          },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data?.url) {
+        window.location.href = data.url; // ✅ Redirect to Stripe Checkout
+      } else {
+        alert("Failed to redirect to payment gateway.");
+      }
+    } catch (err) {
+      alert("Something went wrong while initiating payment.");
+      console.error(err);
+    }
+  };
+
+
+  const handleBuyNow = () => {
+    if (!user) {
+      alert("Please sign in to continue.");
+      window.location.href = "/buyer/login"; // Redirect to login
+      return;
+    }
+    setIsOrderModalOpen(true); // Show order modal if authenticated
+  };
+
 
   if (!product) {
     return (
@@ -183,9 +229,8 @@ export default function ProductDetail() {
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`aspect-square rounded-lg overflow-hidden border-2 ${
-                    selectedImage === index ? "border-orange-500" : "border-gray-200"
-                  }`}
+                  className={`aspect-square rounded-lg overflow-hidden border-2 ${selectedImage === index ? "border-orange-500" : "border-gray-200"
+                    }`}
                 >
                   <img
                     src={image || "/placeholder.svg"}
@@ -225,9 +270,8 @@ export default function ProductDetail() {
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
-                      className={`w-5 h-5 ${
-                        i < Math.floor(product.artisan.rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                      }`}
+                      className={`w-5 h-5 ${i < Math.floor(product.artisan.rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                        }`}
                     />
                   ))}
                 </div>
@@ -297,15 +341,18 @@ export default function ProductDetail() {
 
               <div className="flex gap-4">
                 <Dialog open={isOrderModalOpen} onOpenChange={setIsOrderModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      size="lg"
-                      className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-                    >
-                      <ShoppingCart className="w-5 h-5 mr-2" />
-                      Order Now
-                    </Button>
-                  </DialogTrigger>
+                  {/* Order Now button outside of DialogTrigger */}
+                  <Button
+                    onClick={handleBuyNow}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                    size="lg"
+                  >
+                    <ShoppingCart className="w-5 h-5 mr-2" />
+                    Order Now
+                  </Button>
+
+
+
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                       <DialogTitle>Place Your Order</DialogTitle>
@@ -499,9 +546,8 @@ export default function ProductDetail() {
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
-                          className={`w-4 h-4 ${
-                            i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                          }`}
+                          className={`w-4 h-4 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                            }`}
                         />
                       ))}
                     </div>
