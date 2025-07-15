@@ -19,8 +19,8 @@ export default function OrderTracking() {
     const mockOrders = [
       {
         id: "KM001",
-        productTitle: "Handcrafted Rajasthani Clay Diya Set",
-        productImage: "/placeholder.svg?height=100&width=100",
+        productTitle: "Handcrafted Clay Diya Set",
+        productImage: "http://localhost:8000/api/listings/68761bebc1b11beb1e9a15f9/images/68761bcfc1b11beb1e9a15f7",
         artisan: "Kamala Devi",
         artisanLocation: "Jaipur, Rajasthan",
         quantity: 2,
@@ -34,8 +34,8 @@ export default function OrderTracking() {
       },
       {
         id: "KM002",
-        productTitle: "Traditional Kashmiri Pashmina Shawl",
-        productImage: "/placeholder.svg?height=100&width=100",
+        productTitle: "Daily Planner Notebook",
+        productImage: "http://localhost:8000/api/listings/68752100585344f0230b9a92/images/687520eb585344f0230b9a90",
         artisan: "Abdul Rahman",
         artisanLocation: "Srinagar, Kashmir",
         quantity: 1,
@@ -50,7 +50,7 @@ export default function OrderTracking() {
       {
         id: "KM003",
         productTitle: "Madhubani Painting - Peacock Design",
-        productImage: "/placeholder.svg?height=100&width=100",
+        productImage: "http://localhost:8000/api/listings/687617c98693e33bbe8f1444/images/687617b48693e33bbe8f1434",
         artisan: "Sunita Kumari",
         artisanLocation: "Madhubani, Bihar",
         quantity: 1,
@@ -66,7 +66,7 @@ export default function OrderTracking() {
       {
         id: "KM004",
         productTitle: "Silver Filigree Jewelry Set",
-        productImage: "/placeholder.svg?height=100&width=100",
+        productImage: "http://localhost:8000/api/listings/6875f50eb5a7111b11339820/images/6875f4f0b5a7111b1133981d",
         artisan: "Meera Patel",
         artisanLocation: "Cuttack, Odisha",
         quantity: 1,
