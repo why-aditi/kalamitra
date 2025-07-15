@@ -215,25 +215,7 @@ export default function Marketplace() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-16 pr-20 py-6 text-lg border-2 border-orange-200 focus:border-orange-400 rounded-2xl bg-white/80 backdrop-blur-sm shadow-lg"
                     />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isVoiceSearch ? "text-red-500 animate-pulse" : "text-gray-400 hover:text-orange-500"
-                        } p-3 rounded-xl`}
-                      onClick={startVoiceSearch}
-                      disabled={isVoiceSearch}
-                    >
-                      <Mic className="w-6 h-6" />
-                    </Button>
                   </div>
-                  {isVoiceSearch && (
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-                      <p className="text-sm text-red-600 animate-pulse flex items-center gap-2">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-                        Listening... Speak now
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Quick Filter Tags */}
