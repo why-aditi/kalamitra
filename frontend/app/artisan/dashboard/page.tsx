@@ -231,10 +231,9 @@ export default function ArtisanDashboard() {
         </div>
 
         <Tabs defaultValue="listings" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="listings">My Listings</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
 
           <TabsContent value="listings" className="space-y-6">
@@ -319,47 +318,6 @@ export default function ArtisanDashboard() {
                 ))}
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="profile" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Profile Settings</h2>
-            <Card>
-              <CardHeader>
-                <CardTitle>Artisan Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Name</Label>
-                    <p className="text-gray-800">{artisanProfile.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Craft</Label>
-                    <p className="text-gray-800">{artisanProfile.craft}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Location</Label>
-                    <p className="text-gray-800">{artisanProfile.region}, {artisanProfile.state}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Language</Label>
-                    <p className="text-gray-800">{artisanProfile.language}</p>
-                  </div>
-                  {artisanProfile.experience && (
-                    <div>
-                      <Label className="text-sm font-medium text-gray-600">Experience</Label>
-                      <p className="text-gray-800">{artisanProfile.experience} years</p>
-                    </div>
-                  )}
-                  {artisanProfile.bio && (
-                    <div className="md:col-span-2">
-                      <Label className="text-sm font-medium text-gray-600">About</Label>
-                      <p className="text-gray-800">{artisanProfile.bio}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>

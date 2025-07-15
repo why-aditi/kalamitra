@@ -16,12 +16,52 @@ router = APIRouter()
 async def get_listings(
     skip: int = 0,
     limit: int = 100,
+    search: str = "",
+    min_price: float = 0,
+    max_price: float = 50000,
+    category: str = "all",
+    state: str = "all",
     db: AsyncIOMotorDatabase = Depends(Database.get_db)
 ):
-    """Get all listings with pagination"""
+    """Get all listings with pagination and filters"""
     try:
+        # Build filter query
+        filter_query = {}
+        
+        # Search in title, description, and tags
+        if search:
+            filter_query["$or"] = [
+                {"title": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+                {"tags": {"$regex": search, "$options": "i"}}
+            ]
+        
+        # Price range filter
+        if min_price > 0 or max_price < 50000:
+            # Extract numeric value from price string and compare
+            filter_query["$expr"] = {
+                "$and": [
+                    {
+                        "$gte": [
+                            {"$toDouble": {"$replaceAll": {"input": {"$replaceAll": {"input": "$suggested_price", "find": "₹", "replacement": ""}}, "find": ",", "replacement": ""}}},
+                            min_price
+                        ]
+                    },
+                    {
+                        "$lte": [
+                            {"$toDouble": {"$replaceAll": {"input": {"$replaceAll": {"input": "$suggested_price", "find": "₹", "replacement": ""}}, "find": ",", "replacement": ""}}},
+                            max_price
+                        ]
+                    }
+                ]
+            }
+        
+        # Category filter
+        if category != "all":
+            filter_query["category"] = {"$regex": f"^{category}$", "$options": "i"}
+        
         # Get listings from the collection
-        listings_cursor = db.listings.find().skip(skip).limit(limit).sort("created_at", -1)
+        listings_cursor = db.listings.find(filter_query).skip(skip).limit(limit).sort("created_at", -1)
         listings = await listings_cursor.to_list(length=limit)
         
         # Convert ObjectId to string for JSON serialization
@@ -31,8 +71,8 @@ async def get_listings(
             if "image_ids" in listing:
                 listing["image_ids"] = [str(img_id) for img_id in listing["image_ids"]]
         
-        # Get total count
-        total_count = await db.listings.count_documents({})
+        # Get total count with filters
+        total_count = await db.listings.count_documents(filter_query)
         
         return {
             "listings": listings,

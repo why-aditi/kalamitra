@@ -65,14 +65,12 @@ export default function Marketplace() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 12;
   const { profile } = useAuthContext();
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  const startVoiceSearch = () => {
-    console.log("Voice search started");
-    setIsVoiceSearch(true);
-  };
 
    useEffect(() => {
     if (searchParams?.get("success") === "true") {
@@ -85,7 +83,17 @@ export default function Marketplace() {
     async function fetchListings() {
       setIsLoading(true);
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings`);
+        const skip = (currentPage - 1) * itemsPerPage;
+        const searchParams = new URLSearchParams({
+          skip: skip.toString(),
+          limit: itemsPerPage.toString(),
+          search: searchQuery,
+          min_price: priceRange[0].toString(),
+          max_price: priceRange[1].toString(),
+          category: selectedCraft,
+          state: selectedState
+        });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${searchParams}`);
         const data = await res.json();
         const products = await Promise.all(
           (data.listings as ListingFromApi[]).map(async (item: ListingFromApi) => {
@@ -130,6 +138,7 @@ export default function Marketplace() {
         );
         setProducts(products);
         setFilteredProducts(products);
+        setTotalCount(data.total || 0);
       } catch (err) {
         console.error(err);
       } finally {
@@ -137,23 +146,82 @@ export default function Marketplace() {
       }
     }
     fetchListings();
-  }, []);
+  }, [currentPage]);
 
+  // Reset page when filters change
   useEffect(() => {
-    let result = products.filter(
-      (p) =>
-        (!searchQuery ||
-          p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          p.artisan.location.toLowerCase().includes(searchQuery.toLowerCase())) &&
-        p.price >= priceRange[0] &&
-        p.price <= priceRange[1] &&
-        (selectedCraft === "all" || (p.category ?? "").toLowerCase() === selectedCraft.toLowerCase()) &&
-        (selectedState === "all" || p.artisan.location.toLowerCase().includes(selectedState.toLowerCase()))
-    );
-    setFilteredProducts(result);
-  }, [products, searchQuery, priceRange, selectedCraft, selectedState]);
+    setCurrentPage(1);
+  }, [searchQuery, priceRange, selectedCraft, selectedState]);
+
+  // Fetch listings when page or filters change
+  useEffect(() => {
+    async function fetchListings() {
+      setIsLoading(true);
+      try {
+        const skip = (currentPage - 1) * itemsPerPage;
+        const searchParams = new URLSearchParams({
+          skip: skip.toString(),
+          limit: itemsPerPage.toString(),
+          search: searchQuery,
+          min_price: priceRange[0].toString(),
+          max_price: priceRange[1].toString(),
+          category: selectedCraft,
+          state: selectedState
+        });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${searchParams}`);
+        const data = await res.json();
+        const products = await Promise.all(
+          (data.listings as ListingFromApi[]).map(async (item: ListingFromApi) => {
+            let artistData: ArtistData = {};
+            try {
+              const artistId = item.artist_id ?? "";
+              console.log("Fetching artist data for ID:", artistId);
+              const artistRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/public/${artistId}`);
+              if (artistRes.ok) artistData = await artistRes.json();
+            } catch {
+              artistData = { name: "Traditional Artisan", region: "Unknown", state: "India" };
+            }
+
+            const suggestedPriceStr = (item.suggested_price ?? "299").toString();
+            const parsedPrice = parseInt(suggestedPriceStr.replace(/\D/g, "")) || 299;
+
+            return {
+              id: item._id,
+              title: item.title || "Untitled Product",
+              description: item.description || "No description available",
+              price: parsedPrice,
+              originalPrice: parsedPrice * 1.2,
+              image: item.image_ids?.[0]
+                ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${item._id}/images/${item.image_ids[0]}`
+                : "/placeholder.svg",
+              artisan: {
+                name: artistData.name || artistData.display_name || "Unknown",
+                location: `${artistData.region ?? "Unknown"}, ${artistData.state ?? "India"}`,
+                rating: 4.8,
+                craft: item.category ?? "Art",
+                verified: true,
+              },
+              category: item.category ?? "Art",
+              tags: item.tags || [],
+              inStock: item.status === "active",
+              featured: Math.random() > 0.7,
+              trending: Math.random() > 0.8,
+              reviews: Math.floor(Math.random() * 50) + 10,
+              soldCount: Math.floor(Math.random() * 100) + 20,
+            };
+          })
+        );
+        setProducts(products);
+        setFilteredProducts(products);
+        setTotalCount(data.total || 0);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchListings();
+  }, [currentPage, searchQuery, priceRange, selectedCraft, selectedState]);
 
   const crafts = [...new Set(products.map((p) => p.category.toLowerCase()))];
   const states = [...new Set(products.map((p) => p.artisan.location.split(",")[1]?.trim().toLowerCase()))];
@@ -368,6 +436,29 @@ export default function Marketplace() {
                       <List className="w-4 h-4" />
                     </Button>
                   </div>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex justify-center items-center gap-4 mb-8">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1 || isLoading}
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-gray-600">
+                    Page {currentPage} of {Math.ceil(totalCount / itemsPerPage)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={currentPage >= Math.ceil(totalCount / itemsPerPage) || isLoading}
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                  >
+                    Next
+                  </Button>
                 </div>
 
                 {/* Products Grid */}

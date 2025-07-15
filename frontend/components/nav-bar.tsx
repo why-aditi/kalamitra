@@ -20,12 +20,14 @@ export function NavBar() {
           { href: '/marketplace', label: 'Marketplace' },
           { href: '/artisan/dashboard', label: 'Dashboard' },
           { href: '/artisan/products', label: 'My Products' },
-          { href: '/artisan/orders', label: 'Orders' }
+          { href: '/artisan/orders', label: 'Orders' },
+          { href: '/artisan/profile', label: 'Profile' }
         ];
-      case 'buyer':
+      case 'user':
         return [
           { href: '/marketplace', label: 'Marketplace' },
-          { href: '/buyer/orders', label: 'My Orders' }
+          { href: '/buyer/orders', label: 'My Orders' },
+          { href: '/buyer/profile', label: 'Profile' }
         ];
       case 'admin':
         return [
@@ -33,7 +35,8 @@ export function NavBar() {
           { href: '/admin/dashboard', label: 'Dashboard' },
           { href: '/admin/users', label: 'Users' },
           { href: '/admin/products', label: 'Products' },
-          { href: '/admin/orders', label: 'Orders' }
+          { href: '/admin/orders', label: 'Orders' },
+          { href: '/admin/profile', label: 'Profile' }
         ];
       default:
         return [{ href: '/marketplace', label: 'Marketplace' }];

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -30,28 +31,85 @@ import {
   Award,
   Clock,
   CheckCircle,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
+
+// Type definitions
+interface Artisan {
+  name: string;
+  location: string;
+  rating: number;
+  craft: string;
+  experience: string;
+  totalProducts: number;
+  bio: string;
+  avatar: string;
+}
+
+interface Review {
+  id: number;
+  name: string;
+  rating: number;
+  comment: string;
+  date: string;
+  verified: boolean;
+}
+
+interface ShippingInfo {
+  freeShipping: boolean;
+  estimatedDays: string;
+  returnPolicy: string;
+}
+
+interface Product {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  originalPrice: number;
+  images: string[];
+  artisan: Artisan;
+  category: string;
+  tags: string[];
+  inStock: boolean;
+  stockCount: number;
+  features: string[];
+  specifications: Record<string, string>;
+  story: string;
+  reviews: Review[];
+  shippingInfo: ShippingInfo;
+}
+
+interface OrderForm {
+  name: string;
+  phone_number: string;
+  address: string;
+  paymentMethod: string;
+}
 
 export default function ProductDetail() {
   const params = useParams()
+  const router = useRouter()
   const { user } = useAuthContext()
   const [imageError, setImageError] = useState(false);
-  const [product, setProduct] = useState<any>(null)
+  const [product, setProduct] = useState<Product | null>(null)
   const [selectedImage, setSelectedImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
-  const [orderForm, setOrderForm] = useState({
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [orderForm, setOrderForm] = useState<OrderForm>({
     name: "",
     phone_number: "",
     address: "",
-    paymentMethod: "cod",
+    paymentMethod: "card",
   })
+  const { toast } = useToast();
 
   useEffect(() => {
     // Mock product data (in real app, fetch from API)
-    const mockProduct = {
+    const mockProduct: Product = {
       id: Number.parseInt(params.id as string),
       title: "Handcrafted Rajasthani Clay Diya Set",
       description:
@@ -125,54 +183,164 @@ export default function ProductDetail() {
 
   const handleOrder = async () => {
     if (!user) {
-      alert("Please sign in to continue.");
-      window.location.href = "/buyer/login";
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to continue with your purchase.",
+        variant: "destructive",
+      });
+      router.push("/buyer/login");
       return;
     }
 
+    // Validate form data
+    if (!orderForm.name || !orderForm.phone_number || !orderForm.address) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate phone number format (basic validation)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(orderForm.phone_number)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid 10-digit phone number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!product) {
+      toast({
+        title: "Product Error",
+        description: "Product information is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-checkout-session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product: {
-            title: product.title,
-            description: product.description,
-            price: product.price,
-            quantity: quantity,
-          },
-          buyer: {
-            name: orderForm.name,
-            phone_number: orderForm.phone_number,
-            address: orderForm.address,
-            email: user.email,
-          },
-        }),
+      // Show loading state
+      toast({
+        title: "Processing Order...",
+        description: "Creating your order, please wait.",
       });
 
+      const accessToken = localStorage.getItem("accessToken");
+      
+      if (!accessToken) {
+        toast({
+          title: "Authentication Error",
+          description: "Please sign in again to continue.",
+          variant: "destructive",
+        });
+        router.push("/buyer/login");
+        return;
+      }
+
+      const orderData = {
+        product: {
+          id: product.id,
+          title: product.title,
+          description: product.description,
+          price: product.price,
+          quantity: quantity,
+        },
+        buyer: {
+          name: orderForm.name.trim(),
+          phone_number: orderForm.phone_number.trim(),
+          address: orderForm.address.trim(),
+          email: user.email,
+        },
+      };
+
+      console.log("Sending order data:", orderData);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-checkout-session`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      console.log("Response status:", res.status);
+
+      if (!res.ok) {
+        let errorMessage = `Server error: ${res.status}`;
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch (e) {
+          console.error("Error parsing error response:", e);
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await res.json();
+      console.log("Checkout session created:", data);
 
       if (data?.url) {
-        window.location.href = data.url; // ✅ Redirect to Stripe Checkout
+        // Close modal before redirecting
+        setIsOrderModalOpen(false);
+        
+        // Show success message
+        toast({
+          title: "Order Created Successfully!",
+          description: "Redirecting to payment page...",
+          variant: "default",
+        });
+
+        // Small delay to show the toast, then redirect
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 1000);
       } else {
-        alert("Failed to redirect to payment gateway.");
+        throw new Error("No checkout URL received from server");
       }
     } catch (err) {
-      alert("Something went wrong while initiating payment.");
-      console.error(err);
+      console.error("Checkout error:", err);
+      toast({
+        title: "Checkout Error",
+        description: err instanceof Error ? err.message : "Failed to initiate checkout. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
-
 
   const handleBuyNow = () => {
     if (!user) {
-      alert("Please sign in to continue.");
-      window.location.href = "/buyer/login"; // Redirect to login
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to continue with your purchase.",
+        variant: "destructive",
+      });
+      router.push("/buyer/login");
       return;
     }
-    setIsOrderModalOpen(true); // Show order modal if authenticated
+    setIsOrderModalOpen(true);
   };
 
+  const handleQuantityChange = (newQuantity: number) => {
+    if (!product) return;
+    const qty = Math.max(1, Math.min(product.stockCount, newQuantity));
+    setQuantity(qty);
+  };
+
+  const handleInputChange = (field: keyof OrderForm, value: string) => {
+    setOrderForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   if (!product) {
     return (
@@ -198,29 +366,35 @@ export default function ProductDetail() {
                 src={product.images[selectedImage] || "/placeholder.svg"}
                 alt={product.title}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/placeholder.svg";
+                  setImageError(true);
+                }}
               />
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {product.images.map((image: string, index: number) => (
+              {product.images.map((image, index) => (
                 <button
                   key={index}
                   onClick={() => {
                     setSelectedImage(index);
                     setImageError(false);
                   }}
-                  className={`aspect-square rounded-lg overflow-hidden border-2 ${selectedImage === index ? "border-orange-500" : "border-gray-200"
-                    }`}
+                  className={`aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
+                    selectedImage === index ? "border-orange-500" : "border-gray-200 hover:border-orange-300"
+                  }`}
                 >
                   <img
                     src={image || "/placeholder.svg"}
                     alt={`Product ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/placeholder.svg";
+                      const target = e.target as HTMLImageElement;
+                      target.src = "/placeholder.svg";
                     }}
                   />
                 </button>
-
               ))}
             </div>
           </div>
@@ -253,8 +427,9 @@ export default function ProductDetail() {
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
-                      className={`w-5 h-5 ${i < Math.floor(product.artisan.rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                        }`}
+                      className={`w-5 h-5 ${
+                        i < Math.floor(product.artisan.rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                      }`}
                     />
                   ))}
                 </div>
@@ -273,7 +448,7 @@ export default function ProductDetail() {
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-3">Key Features</h3>
               <ul className="space-y-2">
-                {product.features.map((feature: string, index: number) => (
+                {product.features.map((feature, index) => (
                   <li key={index} className="flex items-center gap-2 text-gray-600">
                     <CheckCircle className="w-4 h-4 text-green-500" />
                     {feature}
@@ -286,7 +461,7 @@ export default function ProductDetail() {
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-3">Tags</h3>
               <div className="flex flex-wrap gap-2">
-                {product.tags.map((tag: string) => (
+                {product.tags.map((tag) => (
                   <Badge key={tag} variant="outline">
                     {tag}
                   </Badge>
@@ -299,14 +474,19 @@ export default function ProductDetail() {
               <div className="flex items-center gap-4">
                 <Label htmlFor="quantity">Quantity:</Label>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setQuantity(Math.max(1, quantity - 1))}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleQuantityChange(quantity - 1)}
+                    disabled={quantity <= 1}
+                  >
                     -
                   </Button>
                   <Input
                     id="quantity"
                     type="number"
                     value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, Number.parseInt(e.target.value) || 1))}
+                    onChange={(e) => handleQuantityChange(Number.parseInt(e.target.value) || 1)}
                     className="w-20 text-center"
                     min="1"
                     max={product.stockCount}
@@ -314,7 +494,8 @@ export default function ProductDetail() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setQuantity(Math.min(product.stockCount, quantity + 1))}
+                    onClick={() => handleQuantityChange(quantity + 1)}
+                    disabled={quantity >= product.stockCount}
                   >
                     +
                   </Button>
@@ -324,17 +505,15 @@ export default function ProductDetail() {
 
               <div className="flex gap-4">
                 <Dialog open={isOrderModalOpen} onOpenChange={setIsOrderModalOpen}>
-                  {/* Order Now button outside of DialogTrigger */}
                   <Button
                     onClick={handleBuyNow}
                     className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
                     size="lg"
+                    disabled={!product.inStock || isProcessing}
                   >
                     <ShoppingCart className="w-5 h-5 mr-2" />
-                    Order Now
+                    {isProcessing ? "Processing..." : "Order Now"}
                   </Button>
-
-
 
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -356,7 +535,7 @@ export default function ProductDetail() {
                           <Input
                             id="name"
                             value={orderForm.name}
-                            onChange={(e) => setOrderForm({ ...orderForm, name: e.target.value })}
+                            onChange={(e) => handleInputChange("name", e.target.value)}
                             placeholder="Enter your full name"
                             required
                           />
@@ -365,9 +544,11 @@ export default function ProductDetail() {
                           <Label htmlFor="phone_number">Phone Number *</Label>
                           <Input
                             id="phone_number"
+                            type="tel"
                             value={orderForm.phone_number}
-                            onChange={(e) => setOrderForm({ ...orderForm, phone_number: e.target.value })}
-                            placeholder="Enter your phone number"
+                            onChange={(e) => handleInputChange("phone_number", e.target.value)}
+                            placeholder="Enter your 10-digit phone number"
+                            maxLength={10}
                             required
                           />
                         </div>
@@ -376,39 +557,27 @@ export default function ProductDetail() {
                           <Textarea
                             id="address"
                             value={orderForm.address}
-                            onChange={(e) => setOrderForm({ ...orderForm, address: e.target.value })}
-                            placeholder="Enter your complete address"
+                            onChange={(e) => handleInputChange("address", e.target.value)}
+                            placeholder="Enter your complete address with pin code"
                             rows={3}
                             required
                           />
-                        </div>
-                        <div>
-                          <Label>Payment Method</Label>
-                          <div className="flex gap-2 mt-2">
-                            <Button
-                              variant={orderForm.paymentMethod === "cod" ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setOrderForm({ ...orderForm, paymentMethod: "cod" })}
-                            >
-                              Cash on Delivery
-                            </Button>
-                            <Button
-                              variant={orderForm.paymentMethod === "upi" ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => setOrderForm({ ...orderForm, paymentMethod: "upi" })}
-                            >
-                              UPI
-                            </Button>
-                          </div>
                         </div>
                       </div>
 
                       <Button
                         onClick={handleOrder}
                         className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-                        disabled={!orderForm.name || !orderForm.phone_number || !orderForm.address}
+                        disabled={!orderForm.name || !orderForm.phone_number || !orderForm.address || isProcessing}
                       >
-                        Confirm Order - ₹{product.price * quantity}
+                        {isProcessing ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          `Confirm Order - ₹${product.price * quantity}`
+                        )}
                       </Button>
                     </div>
                   </DialogContent>
@@ -494,7 +663,7 @@ export default function ProductDetail() {
                 {Object.entries(product.specifications).map(([key, value]) => (
                   <div key={key} className="flex justify-between py-2 border-b border-gray-100">
                     <span className="font-medium text-gray-600">{key}:</span>
-                    <span className="text-gray-800">{value as string}</span>
+                    <span className="text-gray-800">{value}</span>
                   </div>
                 ))}
               </div>
@@ -511,7 +680,7 @@ export default function ProductDetail() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {product.reviews.map((review: any) => (
+                {product.reviews.map((review) => (
                   <div key={review.id} className="border-b border-gray-100 pb-4 last:border-b-0">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -529,8 +698,9 @@ export default function ProductDetail() {
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
-                          className={`w-4 h-4 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                            }`}
+                          className={`w-4 h-4 ${
+                            i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                          }`}
                         />
                       ))}
                     </div>
@@ -545,4 +715,3 @@ export default function ProductDetail() {
     </div>
   )
 }
-
