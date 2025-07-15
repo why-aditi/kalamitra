@@ -2,26 +2,40 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
+import { useAuthContext } from "@/components/providers/auth-provider";
+import { api } from "@/lib/api-client";
 
 interface Order {
   _id: string;
   productTitle: string;
   status: string;
   createdAt: string;
+  quantity: number;
+  totalAmount: number;
+  productImage?: string;
 }
 
 export default function BuyerOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuthContext();
 
   useEffect(() => {
-    // TODO: Replace with real API call
-    // Simulate loading
-    setTimeout(() => {
-      setOrders([]); // No orders yet
-      setLoading(false);
-    }, 1000);
-  }, []);
+    const fetchOrders = async () => {
+      if (!user?.email) return;
+      
+      try {
+        const response = await api.get<{ orders: Order[] }>(`api/orders?email=${user.email}`);
+        setOrders(response.orders);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [user?.email]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 py-10">
@@ -40,12 +54,40 @@ export default function BuyerOrders() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {orders.map((order) => (
               <Card key={order._id} className="border-orange-200 hover:shadow-lg transition-shadow">
+                {order.productImage && (
+                  <div className="relative h-48 w-full overflow-hidden rounded-t-lg">
+                    <img
+                      src={order.productImage}
+                      alt={order.productTitle}
+                      className="object-cover w-full h-full"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/placeholder.svg';
+                      }}
+                    />
+                  </div>
+                )}
                 <CardHeader>
-                  <CardTitle>{order.productTitle}</CardTitle>
+                  <CardTitle className="text-lg">{order.productTitle}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="mb-2">Status: <span className="font-semibold">{order.status}</span></div>
-                  <div className="text-xs text-gray-500">Ordered on {new Date(order.createdAt).toLocaleDateString()}</div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Status:</span>
+                      <span className="font-semibold capitalize">{order.status}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Quantity:</span>
+                      <span>{order.quantity}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Total Amount:</span>
+                      <span>₹{order.totalAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 pt-2 border-t">
+                      Ordered on {new Date(order.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             ))}
