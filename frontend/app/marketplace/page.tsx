@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Search, Heart, MapPin, Star, Mic, Grid, List, Filter, Palette, Sparkles, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import { useAuthContext } from "@/components/providers/auth-provider";
 
 type Product = {
   id: string;
@@ -63,6 +64,7 @@ export default function Marketplace() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
+  const { profile } = useAuthContext();
 
   const startVoiceSearch = () => {
     console.log("Voice search started");
@@ -507,7 +509,7 @@ export default function Marketplace() {
                                   <Button
                                     className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 text-sm font-semibold shadow"
                                     onClick={() => {
-                                      if (!user) {
+                                      if (!profile) {
                                         window.location.href = "/buyer/login";
                                         return;
                                       }
