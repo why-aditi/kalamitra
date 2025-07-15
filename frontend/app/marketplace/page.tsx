@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,11 +66,20 @@ export default function Marketplace() {
   const [error, setError] = useState<string | null>(null);
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
   const { profile } = useAuthContext();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const startVoiceSearch = () => {
     console.log("Voice search started");
     setIsVoiceSearch(true);
   };
+
+   useEffect(() => {
+    if (searchParams?.get("success") === "true") {
+      router.replace("/marketplace/success");
+    }
+  }, [searchParams, router]);
+
 
   useEffect(() => {
     async function fetchListings() {
