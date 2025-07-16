@@ -41,14 +41,27 @@ async def get_orders(email: str, db: AsyncIOMotorDatabase = Depends(Database.get
 
             # --- Fetch Product Listing Details ---
             product_listing = None
-            if "product_id" in order_doc and order_doc["product_id"]:
+            product_id = order_doc.get("product_id")
+            if product_id:
                 try:
-                    # Ensure product_id is an ObjectId for lookup
-                    product_listing = await listings_collection.find_one({"_id": ObjectId(order_doc["product_id"])})
+        # Try ObjectId first
+                    try:
+                        product_listing = await listings_collection.find_one({"_id": ObjectId(product_id)})
+                    except Exception:
+            # If ObjectId fails, try as string
+                        product_listing = await listings_collection.find_one({"_id": product_id})
                 except Exception as e:
-                    print(f"DEBUG_ORDERS_API: Error fetching listing {order_doc['product_id']}: {e}")
+                    print(f"DEBUG_ORDERS_API: Error fetching listing {product_id}: {e}")
 
-            product_title = product_listing.get("title", "Unknown Product") if product_listing else "Unknown Product"
+            product_title = (
+                product_listing.get("title")
+                if product_listing and product_listing.get("title")
+                else order_doc.get("product_title")
+                or order_doc.get("productTitle")
+                or order_doc.get("product_name")
+                or "Unknown Product"
+            )
+
             product_image_url = "/placeholder.svg" # Default placeholder
 
             if product_listing and product_listing.get("image_ids"):

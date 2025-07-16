@@ -9,9 +9,9 @@ import { useAuthContext } from "@/components/providers/auth-provider"
 import { api } from "@/lib/api-client" // Assuming this is your API client
 
 interface Order {
-  id: string 
+  id: string
   productTitle: string
-  productImage: string 
+  productImage: string
   buyer: string // Assuming buyer name is available
   amount: string // This should match the backend response
   total_amount: string // Keep this for compatibility
@@ -34,22 +34,38 @@ export default function BuyerOrders() {
     const fetchOrders = async () => {
       if (!user?.email) {
         setLoading(false)
-        return // Do not fetch if user email is not available
+        return
       }
-
       try {
-        const response = await api.get<{ orders: Order[] }>(`api/orders?email=${user.email}`)
-        setOrders(response.orders || [])
+        const response = await api.get<{ orders: any[] }>(`api/orders?email=${user.email}`)
+        // Map backend fields to frontend Order type
+        const mappedOrders = (response.orders || []).map((order) => ({
+          id: order._id || order.id,
+          productTitle: order.productTitle || order.product_title || order.product_name || order.product?.title || "Unknown Product",
+          productImage: order.productImage || order.product_image || order.product?.image || "/placeholder.svg",
+          buyer: order.buyer_name || order.buyer || order.buyerName || "",
+          amount: order.amount || order.total_amount || order.price || "",
+          total_amount: order.total_amount || "",
+          status: order.status,
+          date: order.order_date || order.createdAt || order.date,
+          quantity: order.quantity,
+          shippingAddress: order.shipping_address,
+          paymentMethod: order.payment_method,
+          trackingNumber: order.tracking_number,
+          estimatedDelivery: order.estimated_delivery,
+          deliveredDate: order.delivered_date,
+        }))
+        setOrders(mappedOrders)
       } catch (error) {
         console.error("Error fetching orders:", error)
-        setOrders([]) // Clear orders on error
+        setOrders([])
       } finally {
         setLoading(false)
       }
     }
     fetchOrders()
-  }, [user?.email]) 
-  
+  }, [user?.email])
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -143,7 +159,9 @@ export default function BuyerOrders() {
                     />
                     {/* Order Details */}
                     <div className="flex-1 space-y-2">
-                      <h3 className="font-semibold text-gray-800">{order.productTitle}</h3>
+                      <h3 className="font-semibold text-gray-800">{order.productTitle || "Unknown Product"}</h3>
+
+
                       <p className="text-sm text-gray-600">
                         Ordered by {order.buyer} • Quantity: {order.quantity}
                       </p>
