@@ -1,94 +1,94 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, Search, Package, Truck, CheckCircle, Clock, ArrowLeft, Eye, MessageCircle, Star } from "lucide-react"
+import { Search, Package, Truck, CheckCircle, Clock, Eye, MessageCircle } from "lucide-react"
 import Link from "next/link"
+import { useAuthContext } from "@/components/providers/auth-provider"
+import { api } from "@/lib/api-client"
+import { Loader2 } from "lucide-react"
 
-export default function OrderTracking() {
-  const [orders, setOrders] = useState<any[]>([])
+// Define the interface for an order as seen by an artisan
+interface Order {
+  id: string // Matches backend '_id' of the order
+  productTitle: string
+  productImage: string // Backend provides full URL
+  buyer: string // This will be the buyer's name
+  amount: string // "₹XXX.XX"
+  status: string
+  date: string // ISO string for order date
+  quantity: number
+  shippingAddress?: string
+  paymentMethod?: string
+  trackingNumber?: string | null
+  estimatedDelivery?: string | null
+  deliveredDate?: string | null
+}
+
+export default function ArtisanOrdersPage() {
+  const { user, loading: authLoading } = useAuthContext()
+  const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [filteredOrders, setFilteredOrders] = useState<any[]>([])
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(true)
 
   useEffect(() => {
-    // Mock orders data
-    const mockOrders = [
-      {
-        id: "KM001",
-        productTitle: "Handcrafted Clay Diya Set",
-        productImage: "http://localhost:8000/api/listings/68761bebc1b11beb1e9a15f9/images/68761bcfc1b11beb1e9a15f7",
-        artisan: "Kamala Devi",
-        artisanLocation: "Jaipur, Rajasthan",
-        quantity: 2,
-        amount: 598,
-        status: "shipped",
-        orderDate: "2024-01-15",
-        estimatedDelivery: "2024-01-22",
-        trackingNumber: "TRK123456789",
-        paymentMethod: "COD",
-        shippingAddress: "123 Main Street, Mumbai, Maharashtra - 400001"
-      },
-      {
-        id: "KM002",
-        productTitle: "Daily Planner Notebook",
-        productImage: "http://localhost:8000/api/listings/68752100585344f0230b9a92/images/687520eb585344f0230b9a90",
-        artisan: "Abdul Rahman",
-        artisanLocation: "Srinagar, Kashmir",
-        quantity: 1,
-        amount: 2499,
-        status: "confirmed",
-        orderDate: "2024-01-18",
-        estimatedDelivery: "2024-01-25",
-        trackingNumber: null,
-        paymentMethod: "UPI",
-        shippingAddress: "456 Park Avenue, Delhi - 110001"
-      },
-      {
-        id: "KM003",
-        productTitle: "Madhubani Painting - Peacock Design",
-        productImage: "http://localhost:8000/api/listings/687617c98693e33bbe8f1444/images/687617b48693e33bbe8f1434",
-        artisan: "Sunita Kumari",
-        artisanLocation: "Madhubani, Bihar",
-        quantity: 1,
-        amount: 899,
-        status: "delivered",
-        orderDate: "2024-01-10",
-        estimatedDelivery: "2024-01-17",
-        deliveredDate: "2024-01-16",
-        trackingNumber: "TRK987654321",
-        paymentMethod: "COD",
-        shippingAddress: "789 Garden Road, Bangalore, Karnataka - 560001"
-      },
-      {
-        id: "KM004",
-        productTitle: "Silver Filigree Jewelry Set",
-        productImage: "http://localhost:8000/api/listings/6875f50eb5a7111b11339820/images/6875f4f0b5a7111b1133981d",
-        artisan: "Meera Patel",
-        artisanLocation: "Cuttack, Odisha",
-        quantity: 1,
-        amount: 1899,
-        status: "pending",
-        orderDate: "2024-01-20",
-        estimatedDelivery: "2024-01-27",
-        trackingNumber: null,
-        paymentMethod: "UPI",
-        shippingAddress: "321 Lake View, Pune, Maharashtra - 411001"
+    const fetchArtisanOrders = async () => {
+      if (authLoading) return // Wait for auth context to load
+      console.log("DEBUG_AUTH: Current user object:", user)
+
+      // Ensure user is logged in and has a firebase_uid (which is used as artist_id in backend)
+      if (!user?.uid) {
+        // Correctly check for the 'uid' property from firebase/auth User
+        setLoadingOrders(false)
+        console.log("DEBUG_AUTH: User not logged in or Firebase UID not available. Cannot fetch artisan orders.")
+        // Optionally redirect to login or show a message
+        return
       }
-    ]
-    setOrders(mockOrders)
-    setFilteredOrders(mockOrders)
-  }, [])
+
+      setLoadingOrders(true)
+      try {
+        // Fetch orders for the logged-in artisan's products
+        // The /api/artist/orders endpoint handles authentication via token
+        const token = localStorage.getItem("accessToken")
+        if (!token) {
+          console.error("No access token found for fetching artisan orders.")
+          setLoadingOrders(false)
+          return
+        }
+
+        // Change the endpoint to fetch orders where the artisan is the buyer
+        // This will use the /api/orders endpoint which expects an 'email' query parameter.
+        const response = await api.get<{ orders: Order[] }>(`/api/orders?email=${user.email}`, {
+          headers: {
+            Authorization: `Bearer ${token}`, // Still send token for authentication if needed by /api/orders
+            "Content-Type": "application/json",
+          },
+        })
+        console.log("DEBUG_ARTISAN_BUYER_ORDERS: API response received:", response)
+        console.log("DEBUG_ARTISAN_BUYER_ORDERS: Orders array from API:", response.orders)
+        setOrders(response.orders || []) // The backend for /api/orders returns { orders: Order[] }
+      } catch (error) {
+        console.error("Error fetching artisan orders:", error)
+        setOrders([]) // Clear orders on error
+      } finally {
+        setLoadingOrders(false)
+      }
+    }
+
+    fetchArtisanOrders()
+  }, [authLoading]) // Re-fetch when auth loading state changes
 
   useEffect(() => {
     if (searchQuery) {
-      const filtered = orders.filter(order =>
-        order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.productTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.artisan.toLowerCase().includes(searchQuery.toLowerCase())
+      const filtered = orders.filter(
+        (order) =>
+          order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          order.productTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          order.buyer.toLowerCase().includes(searchQuery.toLowerCase()), // Artisan might search by buyer name
       )
       setFilteredOrders(filtered)
     } else {
@@ -98,26 +98,49 @@ export default function OrderTracking() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'confirmed': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'shipped': return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'delivered': return 'bg-green-100 text-green-800 border-green-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "confirmed":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "shipped":
+        return "bg-purple-100 text-purple-800 border-purple-200"
+      case "delivered":
+        return "bg-green-100 text-green-800 border-green-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
     }
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Clock className="w-4 h-4" />
-      case 'confirmed': return <CheckCircle className="w-4 h-4" />
-      case 'shipped': return <Truck className="w-4 h-4" />
-      case 'delivered': return <Package className="w-4 h-4" />
-      default: return <Clock className="w-4 h-4" />
+      case "pending":
+        return <Clock className="w-4 h-4" />
+      case "confirmed":
+        return <CheckCircle className="w-4 h-4" />
+      case "shipped":
+        return <Truck className="w-4 h-4" />
+      case "delivered":
+        return <Package className="w-4 h-4" />
+      default:
+        return <Clock className="w-4 h-4" />
     }
   }
 
   const getOrdersByStatus = (status: string) => {
-    return filteredOrders.filter(order => order.status === status)
+    return filteredOrders.filter((order) => order.status === status)
+  }
+
+  if (authLoading || loadingOrders) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          </div>
+          <p className="text-gray-600">Loading your orders...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -126,54 +149,43 @@ export default function OrderTracking() {
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">My Orders</h1>
-          <p className="text-gray-600">Track your orders and manage your purchases</p>
+          <p className="text-gray-600">Manage orders of your products</p>
         </div>
-
         {/* Search */}
         <div className="mb-6">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
-              placeholder="Search orders by ID, product, or artisan..."
+              placeholder="Search orders by ID, product, or buyer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 border-orange-200 focus:border-orange-400"
             />
           </div>
         </div>
-
         {/* Orders Tabs */}
         <Tabs defaultValue="all" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">
-              All Orders ({filteredOrders.length})
-            </TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending ({getOrdersByStatus('pending').length})
-            </TabsTrigger>
-            <TabsTrigger value="confirmed">
-              Confirmed ({getOrdersByStatus('confirmed').length})
-            </TabsTrigger>
-            <TabsTrigger value="shipped">
-              Shipped ({getOrdersByStatus('shipped').length})
-            </TabsTrigger>
-            <TabsTrigger value="delivered">
-              Delivered ({getOrdersByStatus('delivered').length})
-            </TabsTrigger>
+            <TabsTrigger value="all">All Orders ({filteredOrders.length})</TabsTrigger>
+            <TabsTrigger value="pending">Pending ({getOrdersByStatus("pending").length})</TabsTrigger>
+            <TabsTrigger value="confirmed">Confirmed ({getOrdersByStatus("confirmed").length})</TabsTrigger>
+            <TabsTrigger value="shipped">Shipped ({getOrdersByStatus("shipped").length})</TabsTrigger>
+            <TabsTrigger value="delivered">Delivered ({getOrdersByStatus("delivered").length})</TabsTrigger>
           </TabsList>
-
           {/* All Orders */}
           <TabsContent value="all" className="space-y-4">
             {filteredOrders.length === 0 ? (
               <Card className="border-orange-200">
                 <CardContent className="p-12 text-center">
                   <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No orders found</h3>
+                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No orders yet</h3>
                   <p className="text-gray-500 mb-6">
-                    {searchQuery ? 'Try adjusting your search terms' : 'Start shopping to see your orders here'}
+                    {searchQuery
+                      ? "Try adjusting your search terms"
+                      : "Customers' orders for your products will appear here"}
                   </p>
                   <Button asChild>
-                    <Link href="/marketplace">Browse Products</Link>
+                    <Link href="/artisan/products">Manage Your Products</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -188,44 +200,41 @@ export default function OrderTracking() {
                           src={order.productImage || "/placeholder.svg"}
                           alt={order.productTitle}
                           className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg" // Fallback on error
+                          }}
                         />
-                        
                         {/* Order Details */}
                         <div className="flex-1 space-y-3">
                           <div className="flex items-start justify-between">
                             <div>
                               <h3 className="font-semibold text-gray-800 mb-1">{order.productTitle}</h3>
-                              <p className="text-sm text-gray-600">
-                                by {order.artisan} • {order.artisanLocation}
-                              </p>
+                              <p className="text-sm text-gray-600">Ordered by {order.buyer}</p>
                               <p className="text-sm text-gray-500">
                                 Order ID: {order.id} • Quantity: {order.quantity}
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-lg font-bold text-gray-800">₹{order.amount}</p>
+                              <p className="text-lg font-bold text-gray-800">{order.amount}</p>
                               <Badge className={`${getStatusColor(order.status)} border`}>
                                 {getStatusIcon(order.status)}
                                 <span className="ml-1 capitalize">{order.status}</span>
                               </Badge>
                             </div>
                           </div>
-                          
                           {/* Order Timeline */}
                           <div className="text-sm text-gray-600">
-                            <p>Ordered on: {new Date(order.orderDate).toLocaleDateString()}</p>
-                            {order.status === 'delivered' && order.deliveredDate ? (
+                            <p>Ordered on: {new Date(order.date).toLocaleDateString()}</p>
+                            {order.status === "delivered" && order.deliveredDate ? (
                               <p className="text-green-600">
                                 Delivered on: {new Date(order.deliveredDate).toLocaleDateString()}
                               </p>
                             ) : (
-                              <p>Expected delivery: {new Date(order.estimatedDelivery).toLocaleDateString()}</p>
+                              <p>Expected delivery: {new Date(order.estimatedDelivery || "").toLocaleDateString()}</p>
                             )}
-                            {order.trackingNumber && (
-                              <p>Tracking: {order.trackingNumber}</p>
-                            )}
+                            {order.trackingNumber && <p>Tracking: {order.trackingNumber}</p>}
                           </div>
-                          
                           {/* Action Buttons */}
                           <div className="flex gap-2 pt-2">
                             <Button variant="outline" size="sm">
@@ -235,19 +244,14 @@ export default function OrderTracking() {
                             {order.trackingNumber && (
                               <Button variant="outline" size="sm">
                                 <Truck className="w-4 h-4 mr-1" />
-                                Track Order
+                                Update Tracking
                               </Button>
                             )}
                             <Button variant="outline" size="sm">
                               <MessageCircle className="w-4 h-4 mr-1" />
                               Contact Artisan
                             </Button>
-                            {order.status === 'delivered' && (
-                              <Button variant="outline" size="sm">
-                                <Star className="w-4 h-4 mr-1" />
-                                Rate & Review
-                              </Button>
-                            )}
+                            {/* Removed Rate & Review as it's for buyers */}
                           </div>
                         </div>
                       </div>
@@ -257,20 +261,15 @@ export default function OrderTracking() {
               </div>
             )}
           </TabsContent>
-
           {/* Status-specific tabs */}
-          {['pending', 'confirmed', 'shipped', 'delivered'].map((status) => (
+          {["pending", "confirmed", "shipped", "delivered"].map((status) => (
             <TabsContent key={status} value={status} className="space-y-4">
               {getOrdersByStatus(status).length === 0 ? (
                 <Card className="border-orange-200">
                   <CardContent className="p-12 text-center">
                     {getStatusIcon(status)}
-                    <h3 className="text-xl font-semibold text-gray-600 mb-2 mt-4">
-                      No {status} orders
-                    </h3>
-                    <p className="text-gray-500">
-                      Orders with {status} status will appear here
-                    </p>
+                    <h3 className="text-xl font-semibold text-gray-600 mb-2 mt-4">No {status} orders</h3>
+                    <p className="text-gray-500">Orders with {status} status will appear here</p>
                   </CardContent>
                 </Card>
               ) : (
@@ -288,36 +287,30 @@ export default function OrderTracking() {
                             <div className="flex items-start justify-between">
                               <div>
                                 <h3 className="font-semibold text-gray-800 mb-1">{order.productTitle}</h3>
-                                <p className="text-sm text-gray-600">
-                                  by {order.artisan} • {order.artisanLocation}
-                                </p>
+                                <p className="text-sm text-gray-600">Ordered by {order.buyer}</p>
                                 <p className="text-sm text-gray-500">
                                   Order ID: {order.id} • Quantity: {order.quantity}
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="text-lg font-bold text-gray-800">₹{order.amount}</p>
+                                <p className="text-lg font-bold text-gray-800">{order.amount}</p>
                                 <Badge className={`${getStatusColor(order.status)} border`}>
-                                  {getStatusIcon(order.status)}
+                                  {getStatusIcon(status)}
                                   <span className="ml-1 capitalize">{order.status}</span>
                                 </Badge>
                               </div>
                             </div>
-                            
                             <div className="text-sm text-gray-600">
-                              <p>Ordered on: {new Date(order.orderDate).toLocaleDateString()}</p>
-                              {order.status === 'delivered' && order.deliveredDate ? (
+                              <p>Ordered on: {new Date(order.date).toLocaleDateString()}</p>
+                              {order.status === "delivered" && order.deliveredDate ? (
                                 <p className="text-green-600">
                                   Delivered on: {new Date(order.deliveredDate).toLocaleDateString()}
                                 </p>
                               ) : (
-                                <p>Expected delivery: {new Date(order.estimatedDelivery).toLocaleDateString()}</p>
+                                <p>Expected delivery: {new Date(order.estimatedDelivery || "").toLocaleDateString()}</p>
                               )}
-                              {order.trackingNumber && (
-                                <p>Tracking: {order.trackingNumber}</p>
-                              )}
+                              {order.trackingNumber && <p>Tracking: {order.trackingNumber}</p>}
                             </div>
-                            
                             <div className="flex gap-2 pt-2">
                               <Button variant="outline" size="sm">
                                 <Eye className="w-4 h-4 mr-1" />
@@ -326,19 +319,14 @@ export default function OrderTracking() {
                               {order.trackingNumber && (
                                 <Button variant="outline" size="sm">
                                   <Truck className="w-4 h-4 mr-1" />
-                                  Track Order
+                                  Update Tracking
                                 </Button>
                               )}
-                                                            <Button variant="outline" size="sm">
+                              <Button variant="outline" size="sm">
                                 <MessageCircle className="w-4 h-4 mr-1" />
                                 Contact Artisan
                               </Button>
-                              {order.status === 'delivered' && (
-                                <Button variant="outline" size="sm">
-                                  <Star className="w-4 h-4 mr-1" />
-                                  Rate & Review
-                                </Button>
-                              )}
+                              {/* Removed Rate & Review as it's for buyers */}
                             </div>
                           </div>
                         </div>
@@ -354,4 +342,3 @@ export default function OrderTracking() {
     </div>
   )
 }
-
