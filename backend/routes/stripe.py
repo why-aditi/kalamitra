@@ -42,15 +42,16 @@ async def create_checkout_session(
         # Save order to database matching your schema first
         order_data = {
             "product_id": str(product.get("id", "")),
-            "buyer_id": current_user["firebase_uid"], # NEW: Save buyer's firebase_uid
+            "product_title": product.get("title", "Unknown Product"),  # <-- Add this line
+            "buyer_id": current_user["firebase_uid"],
             "buyer_name": buyer.get("name", ""),
-            "buyer_email": buyer["email"],
+            "buyerEmail": buyer["email"],
             "total_amount": float(product["price"]) * product.get("quantity", 1),
             "quantity": product.get("quantity", 1),
-            "status": "confirmed",  # Set as confirmed since payment will be handled by Stripe
+            "status": "confirmed",
             "order_date": datetime.utcnow(),
             "shipping_address": buyer.get("address", ""),
-            "payment_method": "Card",  # Since this is Stripe payment
+            "payment_method": "Card",
             "tracking_number": None,
             "estimated_delivery": estimated_delivery,
             "delivered_date": None
@@ -79,7 +80,7 @@ async def create_checkout_session(
             cancel_url=f"http://localhost:3000/marketplace/cancel?order_id={result.inserted_id}",
             metadata={
                 "order_id": str(result.inserted_id),
-                "buyer_email": buyer["email"],
+                "buyerEmail": buyer["email"],  
                 "buyer_name": buyer.get("name", ""),
                 "product_title": product["title"],
                 "product_id": str(product.get("id", "")),
