@@ -176,8 +176,8 @@ export default function ArtisanDashboard() {
           </div>
         </div>
       )}
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
+      <div className="container mx-auto px-4 py-8 mb-8">
+        <div className="mx-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {artisanProfile.name}! 👋</h1>
           <p className="text-gray-600">
             {artisanProfile.craft} artisan from {artisanProfile.region}, {artisanProfile.state}
@@ -185,7 +185,7 @@ export default function ArtisanDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 m-8">
           <Card className="border-orange-200">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
@@ -224,7 +224,7 @@ export default function ArtisanDashboard() {
           </Card>
         </div>
 
-        <Tabs defaultValue="listings" className="space-y-6">
+        <Tabs defaultValue="listings" className="space-y-6 m-8">
           <TabsList className="grid w-full grid-cols-2">
             {" "}
             {/* Changed to 3 columns for profile tab */}
@@ -232,7 +232,7 @@ export default function ArtisanDashboard() {
             <TabsTrigger value="orders">Orders</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="listings" className="space-y-6">
+          <TabsContent value="listings" className="space-y-6 m-8">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-800">My Listings</h2>
               <Button asChild className="bg-gradient-to-r from-orange-500 to-red-500">
