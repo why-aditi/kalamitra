@@ -160,6 +160,16 @@ export default function ProductDetail() {
       })
       return
     }
+    // NEW: Check if user.email is available
+    if (!user.email) {
+      toast({
+        title: "User Email Missing",
+        description: "Your email address is required to place an order. Please ensure your profile is complete.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsProcessing(true)
 
     try {
@@ -181,16 +191,23 @@ export default function ProductDetail() {
       }
 
       const orderData = {
-        product_id: product.id, // Use product.id (string)
-        quantity: quantity,
-        buyer_name: orderForm.name.trim(),
-        buyer_phone_number: orderForm.phone_number.trim(),
-        shipping_address: orderForm.address.trim(),
-        payment_method: orderForm.paymentMethod,
-        buyer_email: user.email, // Pass buyer's email
+        product: {
+          id: product.id,
+          title: product.title,
+          description: product.description,
+          price: product.price,
+          quantity: quantity, // This quantity is for the product in the line_items
+        },
+        buyer: {
+          name: orderForm.name.trim(),
+          email: user.email,
+          phone_number: orderForm.phone_number.trim(),
+          address: orderForm.address.trim(),
+        },
       }
 
-      console.log("Sending order data:", orderData)
+      console.log("Sending order data:", orderData) // Keep this for debugging!
+      console.log("DEBUG: Product ID being sent:", product.id)
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-checkout-session`, {
         method: "POST",
