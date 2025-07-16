@@ -9,11 +9,12 @@ import { useAuthContext } from "@/components/providers/auth-provider"
 import { api } from "@/lib/api-client" // Assuming this is your API client
 
 interface Order {
-  id: string // Matches backend 'id'
+  id: string 
   productTitle: string
-  productImage: string // Backend provides full URL
+  productImage: string 
   buyer: string // Assuming buyer name is available
-  amount: string // "₹XXX.XX"
+  amount: string // This should match the backend response
+  total_amount: string // Keep this for compatibility
   status: string
   date: string // ISO string for order date
   quantity: number
@@ -37,8 +38,6 @@ export default function BuyerOrders() {
       }
 
       try {
-        // Assuming your backend has an endpoint like /api/orders that returns buyer-specific orders
-        // and that the response structure is { orders: Order[] }
         const response = await api.get<{ orders: Order[] }>(`api/orders?email=${user.email}`)
         setOrders(response.orders || [])
       } catch (error) {
@@ -49,8 +48,8 @@ export default function BuyerOrders() {
       }
     }
     fetchOrders()
-  }, [user?.email]) // Re-fetch when user email changes
-
+  }, [user?.email]) 
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -162,11 +161,11 @@ export default function BuyerOrders() {
                         <div className="text-xs text-green-600">
                           Delivered on: {new Date(order.deliveredDate).toLocaleDateString()}
                         </div>
-                      ) : (
+                      ) : order.estimatedDelivery ? (
                         <div className="text-xs text-gray-600">
-                          Expected delivery: {new Date(order.estimatedDelivery ?? "").toLocaleDateString()}
+                          Expected delivery: {new Date(order.estimatedDelivery).toLocaleDateString()}
                         </div>
-                      )}
+                      ) : null}
                       {order.trackingNumber && (
                         <div className="text-xs text-gray-600">Tracking: {order.trackingNumber}</div>
                       )}
