@@ -39,13 +39,13 @@ class ArtisanProfileDB(BaseModel):
     bio: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    is_onboarded: Optional[bool] = False
-
+    is_onboarded: bool = False
 
     class Config:
         validate_by_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
+
 
 class ArtisanProfileResponse(BaseModel):
     id: str = Field(alias="_id")
@@ -59,10 +59,6 @@ class ArtisanProfileResponse(BaseModel):
     bio: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-
-    class Config:
-        validate_by_name = True
-        json_encoders = {ObjectId: str}
 
     class Config:
         validate_by_name = True

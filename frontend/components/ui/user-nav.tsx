@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { useAuthContext } from '@/components/providers/auth-provider';
-import { Button } from '@/components/ui/button';
+import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/components/providers/auth-provider";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,8 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuGroup,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function UserNav() {
   const { user, profile, signOut } = useAuthContext();
@@ -26,25 +26,25 @@ export function UserNav() {
     if (!profile) return [];
 
     switch (profile.role) {
-      case 'artisan':
+      case "artisan":
         return [
-          { href: "/artisan/profile", label: 'Profile' },
-          { href: '/artisan/dashboard', label: 'Dashboard' },
-          { href: '/artisan/products', label: 'My Products' },
-          { href: '/artisan/orders', label: 'Orders' },
+          { href: "/artisan/profile", label: "Profile" },
+          { href: "/artisan/dashboard", label: "Dashboard" },
+          { href: "/artisan/products", label: "My Products" },
+          { href: "/artisan/orders", label: "Orders" },
         ];
-      case 'user':
+      case "user":
         return [
-          { href: "/buyer/profile", label: 'Profile' },,
-          { href: '/buyer/orders', label: 'My Orders' },
+          { href: "/buyer/profile", label: "Profile" },
+          { href: "/buyer/orders", label: "My Orders" },
         ];
-      case 'admin':
+      case "admin":
         return [
-          { href: "/admin/profile", label: 'Profile' },
-          { href: '/admin/dashboard', label: 'Dashboard' },
-          { href: '/admin/users', label: 'Users' },
-          { href: '/admin/products', label: 'Products' },
-          { href: '/admin/orders', label: 'Orders' },
+          { href: "/admin/profile", label: "Profile" },
+          { href: "/admin/dashboard", label: "Dashboard" },
+          { href: "/admin/users", label: "Users" },
+          { href: "/admin/products", label: "Products" },
+          { href: "/admin/orders", label: "Orders" },
         ];
       default:
         return [];
@@ -54,9 +54,9 @@ export function UserNav() {
   const handleSignOut = async () => {
     try {
       await signOut();
-      router.push('/');
+      router.push("/");
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error("Error signing out:", error);
     }
   };
 
@@ -65,8 +65,8 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.photoURL || ''} alt={user.displayName || 'User avatar'} />
-            <AvatarFallback>{user.displayName?.[0] || 'U'}</AvatarFallback>
+            <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User avatar"} />
+            <AvatarFallback>{user.displayName?.[0] || "U"}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>

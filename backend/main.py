@@ -1,4 +1,4 @@
-from routes import auth, users, artists, listing
+from routes import auth, users, artists, listing, stripe, orders
 from fastapi import FastAPI
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,12 +46,9 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(users.router, prefix="/api", tags=["Users"])
 app.include_router(artists.router, prefix="/api", tags=["Artists"])
-
 app.include_router(listing.router, prefix="/api", tags=["Listings"])
-
-# Stripe router
-from routes import stripe as stripe_router
-app.include_router(stripe_router.router, prefix="/api", tags=["Stripe"])
+app.include_router(stripe.router, prefix="/api", tags=["Stripe"])
+app.include_router(orders.router, prefix="/api", tags=["Orders"])
 
 @app.get("/")
 async def root():

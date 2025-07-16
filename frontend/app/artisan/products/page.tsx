@@ -4,15 +4,15 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Package, Eye, Edit } from "lucide-react"
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge" // Ensure Badge is imported
 
 interface Listing {
-  _id: string
+  id: string // Changed from _id to id to match Pydantic model alias
   title: string
   description: string
   suggestedPrice: string
   category: string
-  image_ids?: string[]
+  images: string[] // This will now contain full URLs from the backend
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
@@ -31,10 +31,12 @@ export default function ArtisanProducts() {
             "Content-Type": "application/json",
           },
         })
-        if (!res.ok) throw new Error("Failed to fetch listings")
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}))
+          throw new Error(errorData.detail || res.statusText || "Failed to fetch listings")
+        }
         const data = await res.json()
-        console.log("Fetched listings data (full response):", data) // Debugging log for full response
-        setListings(data.listings || data || [])
+        setListings(data.listings || []) // Access the 'listings' array from the response
       } catch (err) {
         console.error("Error fetching listings:", err)
         setListings([])
@@ -59,6 +61,7 @@ export default function ArtisanProducts() {
             </Link>
           </Button>
         </div>
+
         {loading ? (
           <div className="text-center text-gray-500 py-20">Loading...</div>
         ) : listings.length === 0 ? (
@@ -80,31 +83,16 @@ export default function ArtisanProducts() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {listings.map((listing, index) => {
-              // Debugging logs for each listing
-              console.log(`Listing ${index} _id:`, listing._id)
-              console.log(`Listing ${index} image_ids:`, listing.image_ids)
-
-              const imageUrl =
-                listing._id && listing.image_ids && listing.image_ids[0]
-                  ? `${BASE_URL}/api/listings/${listing._id}/images/${listing.image_ids[0]}`
-                  : "/placeholder.svg"
-
-              console.log(`Listing ${index} constructed imageUrl:`, imageUrl)
+              const imageUrl = listing.images?.[0] || "/placeholder.svg" // Use the 'images' array directly
 
               return (
-                <Card key={listing._id || `listing-${index}`} className="hover:shadow-lg">
+                <Card key={listing.id || `listing-${index}`} className="hover:shadow-lg">
                   <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                    {imageUrl !== "/placeholder.svg" ? (
-                      <img
-                        src={imageUrl || "/placeholder.svg"}
-                        alt={listing.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                        <Package className="w-12 h-12 text-gray-400" />
-                      </div>
-                    )}
+                    <img
+                      src={imageUrl || "/placeholder.svg"}
+                      alt={listing.title}
+                      className="w-full h-full object-cover"
+                    />
                     <Badge className="absolute top-2 right-2 bg-green-500">Published</Badge>
                   </div>
                   <CardContent className="p-4">
@@ -112,7 +100,7 @@ export default function ArtisanProducts() {
                     <p className="text-gray-600 text-sm mb-3 line-clamp-2">{listing.description}</p>
                     <div className="flex justify-between mb-4">
                       <span className="text-lg font-bold text-orange-600">{listing.suggestedPrice}</span>
-                      <Badge variant="outline">{listing.category}</Badge>
+                      <Badge variant="outline">{listing.category}</Badge> {/* Using Badge for consistency */}
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="flex-1 bg-transparent">

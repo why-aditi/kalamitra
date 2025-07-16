@@ -40,7 +40,7 @@ The frontend application for Kalamitra, built with Next.js 14, TypeScript, and T
 │   └── page.tsx           # Home page
 ├── components/            # Reusable components
 │   ├── ui/               # UI components
-│   └── theme-provider.tsx # Theme configuration
+│   └── providers/        # Context providers
 ├── hooks/                 # Custom React hooks
 ├── lib/                   # Utility functions
 ├── public/                # Static assets
@@ -71,12 +71,15 @@ The frontend application for Kalamitra, built with Next.js 14, TypeScript, and T
 - Use TypeScript interfaces for props
 - Implement proper error handling
 - Add loading states where necessary
+- Follow atomic design principles
+- Document component props using JSDoc
 
 ### State Management
 
 - Use React hooks for local state
 - Implement context for shared state
 - Consider SWR for data fetching
+- Follow the principle of lifting state up
 
 ### Performance
 
@@ -84,6 +87,15 @@ The frontend application for Kalamitra, built with Next.js 14, TypeScript, and T
 - Implement proper loading states
 - Use dynamic imports for code splitting
 - Follow Next.js best practices
+- Implement proper caching strategies
+- Use React.memo for expensive components
+
+### Error Handling
+
+- Implement proper error boundaries
+- Use toast notifications for errors
+- Log errors to monitoring service
+- Handle network errors gracefully
 
 ## Available Scripts
 
@@ -116,3 +128,44 @@ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
 NEXT_PUBLIC_CLOUDINARY_API_KEY=
 NEXT_PUBLIC_CLOUDINARY_API_SECRET=
 ```
+
+## Deployment
+
+1. Build the application:
+   ```bash
+   pnpm build
+   ```
+2. Test the production build:
+   ```bash
+   npm run dev
+   ```
+3. Deploy to your hosting platform of choice
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Build Errors**
+
+   - Clear `.next` directory
+   - Remove `node_modules` and reinstall
+   - Check Node.js version
+
+2. **API Connection**
+
+   - Verify API URL in `.env`
+   - Check CORS configuration
+   - Validate authentication tokens
+
+3. **Image Loading**
+   - Verify Cloudinary configuration
+   - Check image formats and sizes
+   - Validate image paths

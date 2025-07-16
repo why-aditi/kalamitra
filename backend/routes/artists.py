@@ -334,13 +334,35 @@ async def get_artist_orders(current_user: dict = Depends(check_artist_role)):
 @router.get("/public/{artist_id}", response_model=ArtistProfile)
 async def get_public_artist_profile(artist_id: str):
     try:
-        user = auth.get_user(artist_id)
-        # Verify if the user is an artist
-        claims = auth.get_user_claims(artist_id)
-        if claims.get("role") != "artist":
+        db = Database.get_db()
+
+        # Fetch from MongoDB first
+        artisan_profile_doc = await db["users"].find_one({"firebase_uid": artist_id})
+
+        if artisan_profile_doc:
+            serialized_profile = serialize_artisan_doc(artisan_profile_doc)
+            return ArtisanProfileResponse(**serialized_profile)
+
+        # If not found in DB, optionally skip Firebase check, or leave as fallback:
+        try:
+            user = auth.get_user(artist_id)
+            claims = auth.get_user_claims(artist_id)
+            if claims.get("role") != "artisan":  # Adjusted to match MongoDB role convention
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Artist not found"
+                )
+
+            return ArtisanProfileResponse(
+                firebase_uid=user.uid,
+                name=user.display_name,
+                state="",
+                craft=None
+            )
+        except auth.UserNotFoundError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Artist not found"
+                detail="Artist not found in Firebase."
             )
         return ArtistProfile(
             display_name=user.display_name,
@@ -353,6 +375,6 @@ async def get_public_artist_profile(artist_id: str):
         )
     except auth.UserNotFoundError:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Artist not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching public artist profile: {str(e)}"
         )

@@ -108,6 +108,8 @@ Interactive API documentation is available at:
 - Use type hints for function parameters and return values
 - Document functions and classes with docstrings
 - Keep functions focused and single-purpose
+- Use meaningful variable names
+- Implement proper error handling
 
 ### API Design
 
@@ -115,6 +117,8 @@ Interactive API documentation is available at:
 - Implement proper error handling
 - Return appropriate HTTP status codes
 - Validate request data using Pydantic models
+- Document API endpoints thoroughly
+- Version your APIs appropriately
 
 ### Database
 
@@ -122,6 +126,8 @@ Interactive API documentation is available at:
 - Define clear data models with Pydantic
 - Implement proper indexing for performance
 - Handle database errors gracefully
+- Use transactions where necessary
+- Implement data validation
 
 ### Authentication
 
@@ -129,10 +135,75 @@ Interactive API documentation is available at:
 - Implement role-based access control
 - Secure sensitive routes
 - Handle token expiration
+- Implement rate limiting
+- Log authentication events
 
-### Error Handling
+### Security
 
-- Use custom exception handlers
-- Return meaningful error messages
-- Log errors appropriately
-- Handle edge cases
+- Implement input validation
+- Use HTTPS in production
+- Secure sensitive data
+- Implement rate limiting
+- Use secure headers
+- Regular security audits
+- Monitor for vulnerabilities
+
+### Performance
+
+- Optimize database queries
+- Implement caching
+- Use async operations
+- Monitor response times
+- Profile code performance
+- Optimize resource usage
+
+### Monitoring
+
+- Set up logging
+- Implement error tracking
+- Monitor system metrics
+- Set up alerts
+- Track API usage
+- Monitor database performance
+
+## Deployment
+
+1. Build the application:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Set up production environment variables
+
+3. Run with a production server:
+   ```bash
+   gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
+   ```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Database Connection**
+
+   - Check MongoDB connection string
+   - Verify database credentials
+   - Check network connectivity
+
+2. **Authentication**
+
+   - Verify Firebase configuration
+   - Check token validity
+   - Validate user permissions
+
+3. **Performance**
+   - Monitor database queries
+   - Check API response times
+   - Optimize slow endpoints

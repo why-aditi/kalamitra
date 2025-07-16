@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Package, Truck, CheckCircle, Clock, Eye, MessageCircle, Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useAuthContext } from "@/components/providers/auth-provider"
+import { api } from "@/lib/api-client" // Assuming this is your API client
 
 interface Order {
-  id: string
+  id: string // Matches backend 'id'
   productTitle: string
-  productImage: string
-  buyer: string
-  amount: string
+  productImage: string // Backend provides full URL
+  buyer: string // Assuming buyer name is available
+  amount: string // "₹XXX.XX"
   status: string
-  date: string
+  date: string // ISO string for order date
   quantity: number
   shippingAddress?: string
   paymentMethod?: string
@@ -25,63 +27,29 @@ interface Order {
 export default function BuyerOrders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const { user } = useAuthContext() // Get user from auth context
 
   useEffect(() => {
-    // Mock data for buyer orders
-    const mockOrders: Order[] = [
-      {
-        id: "ORD001",
-        productTitle: "Hand-Painted Ceramic Vase",
-        productImage: "http://localhost:8000/api/listings/6875f68ab5a7111b11339824/images/6875f670b5a7111b11339821", // Placeholder image
-        buyer: "Dev Sharma",
-        amount: "599.00",
-        status: "delivered",
-        date: "2025-07-01T10:00:00Z",
-        quantity: 1,
-        shippingAddress: "123 Main St, Anytown, India",
-        paymentMethod: "UPI",
-        trackingNumber: "TRK123456789",
-        estimatedDelivery: "2025-07-05T10:00:00Z",
-        deliveredDate: "2025-07-04T15:30:00Z",
-      },
-      {
-        id: "ORD002",
-        productTitle: "Traditional Diya Set",
-        productImage: "http://localhost:8000/api/listings/68761bebc1b11beb1e9a15f9/images/68761bcfc1b11beb1e9a15f7", // Placeholder image
-        buyer: "Lokesh Kumar",
-        amount: "250.00",
-        status: "shipped",
-        date: "2025-07-10T14:30:00Z",
-        quantity: 2,
-        shippingAddress: "456 Oak Ave, Othercity, India",
-        paymentMethod: "COD",
-        trackingNumber: "TRK987654321",
-        estimatedDelivery: "2025-07-18T10:00:00Z",
-        deliveredDate: null,
-      },
-      {
-        id: "ORD003",
-        productTitle: "Gold Plated Jhumka",
-        productImage: "http://localhost:8000/api/listings/68768a132136e45c25e34435/images/687689f12136e45c25e3442a", // Placeholder image
-        buyer: "Shivani",
-        amount: "1200.00",
-        status: "pending",
-        date: "2025-07-15T09:15:00Z",
-        quantity: 1,
-        shippingAddress: "789 Pine Ln, Somewhere, India",
-        paymentMethod: "Card",
-        trackingNumber: null,
-        estimatedDelivery: "2025-07-22T10:00:00Z",
-        deliveredDate: null,
-      },
-    ]
+    const fetchOrders = async () => {
+      if (!user?.email) {
+        setLoading(false)
+        return // Do not fetch if user email is not available
+      }
 
-    // Simulate loading time
-    setTimeout(() => {
-      setOrders(mockOrders)
-      setLoading(false)
-    }, 1000)
-  }, [])
+      try {
+        // Assuming your backend has an endpoint like /api/orders that returns buyer-specific orders
+        // and that the response structure is { orders: Order[] }
+        const response = await api.get<{ orders: Order[] }>(`api/orders?email=${user.email}`)
+        setOrders(response.orders || [])
+      } catch (error) {
+        console.error("Error fetching orders:", error)
+        setOrders([]) // Clear orders on error
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchOrders()
+  }, [user?.email]) // Re-fetch when user email changes
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -169,6 +137,10 @@ export default function BuyerOrders() {
                       src={order.productImage || "/placeholder.svg"}
                       alt={order.productTitle}
                       className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/placeholder.svg" // Fallback on error
+                      }}
                     />
                     {/* Order Details */}
                     <div className="flex-1 space-y-2">
@@ -177,7 +149,7 @@ export default function BuyerOrders() {
                         Ordered by {order.buyer} • Quantity: {order.quantity}
                       </p>
                       <div className="flex justify-between items-center">
-                        <p className="text-lg font-bold text-gray-800">₹{order.amount}</p>
+                        <p className="text-lg font-bold text-gray-800">{order.amount}</p>
                         <Badge className={`${getStatusColor(order.status)} border`}>
                           {getStatusIcon(order.status)}
                           <span className="ml-1 capitalize">{order.status}</span>

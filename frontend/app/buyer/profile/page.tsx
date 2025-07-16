@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useAuthContext } from '@/components/providers/auth-provider';
-import { LoadingPage } from '@/components/ui/loading';
-import { api } from '@/lib/api-client';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EditProfileForm } from '@/components/forms/edit-profile-form';
+import { useEffect, useState } from "react";
+import { useAuthContext } from "@/components/providers/auth-provider";
+import { LoadingPage } from "@/components/ui/loading";
+import { api } from "@/lib/api-client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EditProfileForm } from "@/components/forms/edit-profile-form";
 
 interface UserProfile {
   _id: string;
@@ -29,11 +29,11 @@ export default function BuyerProfile() {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const data = await api.get<UserProfile>('api/me');
+      const data = await api.get<UserProfile>("api/me");
       setProfile(data);
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      setError('Failed to load profile');
+      console.error("Error fetching profile:", error);
+      setError("Failed to load profile");
     } finally {
       setLoading(false);
     }
@@ -51,7 +51,7 @@ export default function BuyerProfile() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">
         <p className="text-red-500">{error}</p>
       </div>
     );
@@ -59,14 +59,14 @@ export default function BuyerProfile() {
 
   if (!profile) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">
         <p>No profile data available</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 py-10">
       <div className="container mx-auto px-4 max-w-xl">
         <h1 className="text-3xl font-bold text-gray-800 mb-8">My Profile</h1>
 
@@ -92,7 +92,7 @@ export default function BuyerProfile() {
                     <AvatarImage src={profile.photoURL} />
                   ) : (
                     <AvatarFallback>
-                      {profile.display_name?.[0] || '?'}
+                      {profile.display_name?.[0] || "?"}
                     </AvatarFallback>
                   )}
                 </Avatar>
