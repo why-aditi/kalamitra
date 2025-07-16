@@ -1,133 +1,119 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { useAuthContext } from "@/components/providers/auth-provider";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LoadingPage } from "@/components/ui/loading";
-import { Label } from "@/components/ui/label";
-import {
-  Plus,
-  Eye,
-  Edit,
-  Package,
-  TrendingUp,
-  ShoppingCart,
-  Star,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
+"use client"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { useAuthContext } from "@/components/providers/auth-provider"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { LoadingPage } from "@/components/ui/loading"
+import { Plus, Eye, Edit, Package, TrendingUp, ShoppingCart, Star, CheckCircle, Clock, AlertCircle } from "lucide-react"
 
 interface ArtisanProfile {
-  id: string;
-  name: string;
-  craft: string;
-  region: string;
-  state: string;
-  language: string;
-  experience?: string;
-  bio?: string;
+  id: string
+  name: string
+  craft: string
+  region: string
+  state: string
+  language: string
+  experience?: string
+  bio?: string
 }
 
 interface ListingsResponse {
-  listings: Listing[] | [];
-  total: number;
-  limit: number;
-  skip: number;
+  listings: Listing[] | []
+  total: number
+  limit: number
+  skip: number
 }
 
 interface Listing {
-  _id: string;
-  title: string;
-  description: string;
-  images: string[];
-  suggestedPrice: string;
-  category: string;
+  id: string // Changed from _id to id to match Pydantic model alias
+  title: string
+  description: string
+  images: string[] // This will now contain full URLs
+  suggestedPrice: string
+  category: string
 }
 
 interface Order {
-  id: number;
-  productTitle: string;
-  buyer: string;
-  amount: string;
-  status: string;
-  date: string;
-  quantity: number;
+  id: string
+  productTitle: string
+  productImage: string
+  buyer: string
+  amount: string
+  status: string
+  date: string
+  quantity: number
+  shippingAddress?: string
+  paymentMethod?: string
+  trackingNumber?: string | null
+  estimatedDelivery?: string | null
+  deliveredDate?: string | null
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 
 export default function ArtisanDashboard() {
-  const searchParams = useSearchParams();
-  const { profile: authProfile, loading: authLoading } = useAuthContext();
-
-  const [artisanProfile, setArtisanProfile] = useState<ArtisanProfile | null>(null);
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const searchParams = useSearchParams()
+  const { profile: authProfile, loading: authLoading } = useAuthContext()
+  const [artisanProfile, setArtisanProfile] = useState<ArtisanProfile | null>(null)
+  const [listings, setListings] = useState<Listing[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loadingData, setLoadingData] = useState(true)
+  const [showSuccess, setShowSuccess] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-
+    const token = localStorage.getItem("accessToken")
     const fetchWithAuth = async <T,>(endpoint: string): Promise<T> => {
       const res = await fetch(`${BASE_URL}${endpoint}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-      });
-
+      })
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || res.statusText || "API Error");
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.detail || res.statusText || "API Error")
       }
-
-      return res.json();
-    };
+      return res.json()
+    }
 
     const fetchData = async () => {
       if (authProfile && authProfile.role === "artisan") {
-        setLoadingData(true);
+        setLoadingData(true)
         try {
-          const [profileResponse, listingsResponse] = await Promise.all([
+          const [profileResponse, listingsResponse, ordersResponse] = await Promise.all([
             fetchWithAuth<ArtisanProfile>("/api/artist/me"),
             fetchWithAuth<ListingsResponse>("/api/artist/listings"),
-          ]);
-
-          setArtisanProfile(profileResponse);
-          setListings(listingsResponse?.listings ?? []);
-          setOrders([
-            { id: 1, productTitle: "Handcrafted Clay Diya", buyer: "Priya S.", amount: "₹299", status: "pending", date: "2024-01-15", quantity: 2 },
-            { id: 2, productTitle: "Pottery Vase", buyer: "Amit K.", amount: "₹599", status: "confirmed", date: "2024-01-14", quantity: 1 },
-          ]);
+            fetchWithAuth<Order[]>("/api/artist/orders"), // NEW: Fetch real orders
+          ])
+          setArtisanProfile(profileResponse)
+          setListings(listingsResponse?.listings ?? [])
+          setOrders(ordersResponse ?? []) // NEW: Use fetched orders
         } catch (error) {
-          console.error("Failed to fetch artisan dashboard data:", error);
-          setListings([]);
+          console.error("Failed to fetch artisan dashboard data:", error)
+          setListings([])
+          setOrders([]) // Ensure orders are cleared on error
         } finally {
-          setLoadingData(false);
+          setLoadingData(false)
         }
       } else if (!authLoading) {
-        setLoadingData(false);
+        setLoadingData(false)
       }
-    };
+    }
 
-    fetchData();
+    fetchData()
 
     if (searchParams.get("success") === "true") {
-      setShowSuccess(true);
-      const timer = setTimeout(() => setShowSuccess(false), 5000);
-      return () => clearTimeout(timer);
+      setShowSuccess(true)
+      const timer = setTimeout(() => setShowSuccess(false), 5000)
+      return () => clearTimeout(timer)
     }
-  }, [authProfile, authLoading, searchParams]);
+  }, [authProfile, authLoading, searchParams])
 
-  if (authLoading || loadingData) return <LoadingPage />;
+  if (authLoading || loadingData) return <LoadingPage />
 
   if (!artisanProfile) {
     return (
@@ -144,31 +130,41 @@ export default function ArtisanDashboard() {
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   const stats = {
     totalListings: listings.length,
     totalOrders: orders.length,
-    totalRevenue: orders.reduce((sum, order) => sum + parseInt(order.amount.replace("₹", ""), 10), 0),
+    totalRevenue: orders.reduce((sum, order) => sum + Number.parseFloat(order.amount.replace("₹", "")), 0), // Use parseFloat
     avgRating: 4.8,
-  };
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      case "confirmed": return "bg-green-100 text-green-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "confirmed":
+        return "bg-green-100 text-green-800"
+      case "delivered": // Added delivered status color
+        return "bg-blue-100 text-blue-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
-  };
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "pending": return <Clock className="w-4 h-4" />;
-      case "confirmed": return <CheckCircle className="w-4 h-4" />;
-      default: return <AlertCircle className="w-4 h-4" />;
+      case "pending":
+        return <Clock className="w-4 h-4" />
+      case "confirmed":
+        return <CheckCircle className="w-4 h-4" />
+      case "delivered": // Added delivered status icon
+        return <Package className="w-4 h-4" />
+      default:
+        return <AlertCircle className="w-4 h-4" />
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
@@ -180,11 +176,12 @@ export default function ArtisanDashboard() {
           </div>
         </div>
       )}
-
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {artisanProfile.name}! 👋</h1>
-          <p className="text-gray-600">{artisanProfile.craft} artisan from {artisanProfile.region}, {artisanProfile.state}</p>
+          <p className="text-gray-600">
+            {artisanProfile.craft} artisan from {artisanProfile.region}, {artisanProfile.state}
+          </p>
         </div>
 
         {/* Stats Cards */}
@@ -198,7 +195,6 @@ export default function ArtisanDashboard() {
               <Package className="w-8 h-8 text-orange-500" />
             </CardContent>
           </Card>
-          
           <Card className="border-orange-200">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
@@ -208,17 +204,15 @@ export default function ArtisanDashboard() {
               <ShoppingCart className="w-8 h-8 text-orange-500" />
             </CardContent>
           </Card>
-          
           <Card className="border-orange-200">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-3xl font-bold text-gray-800">₹{stats.totalRevenue}</p>
+                <p className="text-3xl font-bold text-gray-800">₹{stats.totalRevenue.toFixed(2)}</p>
               </div>
               <TrendingUp className="w-8 h-8 text-orange-500" />
             </CardContent>
           </Card>
-          
           <Card className="border-orange-200">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
@@ -232,6 +226,8 @@ export default function ArtisanDashboard() {
 
         <Tabs defaultValue="listings" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
+            {" "}
+            {/* Changed to 3 columns for profile tab */}
             <TabsTrigger value="listings">My Listings</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
           </TabsList>
@@ -245,7 +241,6 @@ export default function ArtisanDashboard() {
                 </Link>
               </Button>
             </div>
-
             {listings.length === 0 ? (
               <Card className="border-orange-200 text-center p-12">
                 <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -259,13 +254,13 @@ export default function ArtisanDashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {listings.map((listing, index) => (
-                  <Card key={listing._id || `listing-${index}`} className="hover:shadow-lg">
+                  <Card key={listing.id || `listing-${index}`} className="hover:shadow-lg">
                     <div className="aspect-square relative overflow-hidden rounded-t-lg">
                       {listing.images?.[0] ? (
-                        <img 
-                          src={listing.images[0]} 
-                          alt={listing.title} 
-                          className="w-full h-full object-cover" 
+                        <img
+                          src={listing.images[0] || "/placeholder.svg"}
+                          alt={listing.title}
+                          className="w-full h-full object-cover"
                         />
                       ) : (
                         <div className="w-full h-full bg-gray-200 flex items-center justify-center">
@@ -280,6 +275,14 @@ export default function ArtisanDashboard() {
                       <div className="flex justify-between mb-4">
                         <span className="text-lg font-bold text-orange-600">{listing.suggestedPrice}</span>
                         <Badge variant="outline">{listing.category}</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                          <Eye className="w-4 h-4 mr-1" /> View
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                          <Edit className="w-4 h-4 mr-1" /> Edit
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -300,15 +303,24 @@ export default function ArtisanDashboard() {
                 {orders.map((order) => (
                   <Card key={order.id}>
                     <CardContent className="p-6 flex justify-between items-center">
-                      <div>
-                        <h3 className="font-semibold text-gray-800">{order.productTitle}</h3>
-                        <p className="text-gray-600 text-sm">
-                          Ordered by {order.buyer} • Quantity: {order.quantity}
-                        </p>
+                      <div className="flex items-start gap-4">
+                        <img
+                          src={order.productImage || "/placeholder.svg"}
+                          alt={order.productTitle}
+                          className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                        />
+                        <div>
+                          <h3 className="font-semibold text-gray-800">{order.productTitle}</h3>
+                          <p className="text-gray-600 text-sm">
+                            Ordered by {order.buyer} • Quantity: {order.quantity}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold">{order.amount}</p>
-                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                        <div
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                        >
                           {getStatusIcon(order.status)}
                           {order.status}
                         </div>
@@ -322,6 +334,5 @@ export default function ArtisanDashboard() {
         </Tabs>
       </div>
     </div>
-  );
+  )
 }
-

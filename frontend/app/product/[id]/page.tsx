@@ -100,13 +100,19 @@ export default function ProductDetail() {
 
   useEffect(() => {
     const fetchProduct = async () => {
-      if (!params.id) return
+      if (!params.id) {
+        console.log("DEBUG: params.id is missing, cannot fetch product.")
+        setLoadingProduct(false)
+        return
+      }
+      console.log("DEBUG: Fetching product with params.id:", params.id) // Added debug log for params.id
 
       setLoadingProduct(true)
       try {
         // Fetch product data from your API
         const response = await api.get<{ listing: Product }>(`/api/listings/${params.id}`)
         setProduct(response.listing)
+        console.log("DEBUG: Product fetched successfully. Product ID from API:", response.listing.id) // Log fetched product ID
       } catch (error) {
         console.error("Failed to fetch product details:", error)
         toast({
@@ -192,11 +198,11 @@ export default function ProductDetail() {
 
       const orderData = {
         product: {
-          id: product.id,
+          id: product.id || (params.id as string), // Fallback to params.id if product.id is falsy
           title: product.title,
           description: product.description,
           price: product.price,
-          quantity: quantity, // This quantity is for the product in the line_items
+          quantity: quantity,
         },
         buyer: {
           name: orderForm.name.trim(),
@@ -206,8 +212,8 @@ export default function ProductDetail() {
         },
       }
 
-      console.log("Sending order data:", orderData) // Keep this for debugging!
-      console.log("DEBUG: Product ID being sent:", product.id)
+      console.log("Sending order data:", orderData) // This log is already there!
+      console.log("DEBUG: Product ID being sent:", orderData.product.id) // Updated log to reflect the actual ID being sent
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/create-checkout-session`, {
         method: "POST",

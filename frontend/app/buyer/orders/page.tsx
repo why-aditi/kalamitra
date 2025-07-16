@@ -9,12 +9,11 @@ import { useAuthContext } from "@/components/providers/auth-provider"
 import { api } from "@/lib/api-client" // Assuming this is your API client
 
 interface Order {
-  id: string
+  id: string // Matches backend 'id'
   productTitle: string
-  productImage: string
+  productImage: string // Backend provides full URL
   buyer: string // Assuming buyer name is available
-  amount: string // This should match the backend response
-  total_amount: string // Keep this for compatibility
+  amount: string // "₹XXX.XX"
   status: string
   date: string // ISO string for order date
   quantity: number
@@ -34,37 +33,26 @@ export default function BuyerOrders() {
     const fetchOrders = async () => {
       if (!user?.email) {
         setLoading(false)
-        return
+        console.log("DEBUG_FRONTEND: Current user email:", user?.email)
+        return // Do not fetch if user email is not available
       }
+
       try {
-        const response = await api.get<{ orders: any[] }>(`api/orders?email=${user.email}`)
-        // Map backend fields to frontend Order type
-        const mappedOrders = (response.orders || []).map((order) => ({
-          id: order._id || order.id,
-          productTitle: order.productTitle || order.product_title || order.product_name || order.product?.title || "Unknown Product",
-          productImage: order.productImage || order.product_image || order.product?.image || "/placeholder.svg",
-          buyer: order.buyer_name || order.buyer || order.buyerName || "",
-          amount: order.amount || order.total_amount || order.price || "",
-          total_amount: order.total_amount || "",
-          status: order.status,
-          date: order.order_date || order.createdAt || order.date,
-          quantity: order.quantity,
-          shippingAddress: order.shipping_address,
-          paymentMethod: order.payment_method,
-          trackingNumber: order.tracking_number,
-          estimatedDelivery: order.estimated_delivery,
-          deliveredDate: order.delivered_date,
-        }))
-        setOrders(mappedOrders)
+        // Assuming your backend has an endpoint like /api/orders that returns buyer-specific orders
+        // and that the response structure is { orders: Order[] }
+        const response = await api.get<{ orders: Order[] }>(`api/orders?email=${user.email}`)
+        console.log("DEBUG_FRONTEND: API response received:", response)
+        console.log("DEBUG_FRONTEND: Orders array from API:", response.orders)
+        setOrders(response.orders || [])
       } catch (error) {
-        console.error("Error fetching orders:", error)
-        setOrders([])
+        console.error("DEBUG_FRONTEND: Error fetching orders:", error)
+        setOrders([]) // Clear orders on error
       } finally {
         setLoading(false)
       }
     }
     fetchOrders()
-  }, [user?.email])
+  }, [user?.email]) // Re-fetch when user email changes
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -160,8 +148,6 @@ export default function BuyerOrders() {
                     {/* Order Details */}
                     <div className="flex-1 space-y-2">
                       <h3 className="font-semibold text-gray-800">{order.productTitle || "Unknown Product"}</h3>
-
-
                       <p className="text-sm text-gray-600">
                         Ordered by {order.buyer} • Quantity: {order.quantity}
                       </p>
