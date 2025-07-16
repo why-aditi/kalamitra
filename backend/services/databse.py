@@ -4,6 +4,8 @@ import os
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from dotenv import load_dotenv
 
+
+
 load_dotenv() # Ensure environment variables are loaded here too
 
 class Database:
