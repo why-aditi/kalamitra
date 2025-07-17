@@ -263,70 +263,125 @@ async def get_artist_orders(current_user: dict = Depends(check_artist_role)):
         db = Database.get_db()
         artisan_firebase_uid = current_user["firebase_uid"]
         print(f"DEBUG_ORDERS: Artisan Firebase UID: {artisan_firebase_uid}")
-        # Find listings created by this artisan to get their listing IDs
+        
+        # Method 1: Get orders from artist_orders collection (new method)
+        artist_orders_cursor = db["artist_orders"].find({"artist_id": artisan_firebase_uid}).sort("order_date", -1)
+        artist_orders = await artist_orders_cursor.to_list(None)
+        print(f"DEBUG_ORDERS: Artist orders from artist_orders collection: {len(artist_orders)}")
+        
+        # Method 2: Find listings created by this artisan to get their listing IDs (existing method)
         artisan_listings_cursor = db["listings"].find({"artist_id": artisan_firebase_uid}, {"_id": 1})
         artisan_listing_ids = [str(listing["_id"]) for listing in await artisan_listings_cursor.to_list(None)]
         print(f"DEBUG_ORDERS: Artisan's listing IDs found: {artisan_listing_ids}")
-        if not artisan_listing_ids:
-            print("DEBUG_ORDERS: No listings found for this artisan. Returning empty orders list.")
-            return []
+        
         # Find orders where the product_id is one of the artisan's listing IDs
-        # Assuming 'product_id' in orders collection stores the listing's _id
-        orders_cursor = db["orders"].find({"product_id": {"$in": artisan_listing_ids}}).sort("order_date", -1)
-        print(f"DEBUG_ORDERS: Querying orders with product_id in: {artisan_listing_ids}")
-        orders = await orders_cursor.to_list(None)
-        print(f"DEBUG_ORDERS: Raw orders fetched from DB: {orders}")
-        serialized_orders = []
-        for order_doc in orders:
-            print(f"DEBUG_ORDERS: Processing order_doc: {order_doc.get('_id')}, product_id: {order_doc.get('product_id')}")
-            # Convert ObjectId to string for _id
-            order_doc["_id"] = str(order_doc["_id"])
-            # Fetch product details (especially image_ids) from the listings collection
-            product_listing = await db["listings"].find_one({"_id": ObjectId(order_doc["product_id"])})
-            print(f"DEBUG_ORDERS: Fetched product listing for order: {product_listing.get('title') if product_listing else 'None'}")
-            product_image_url = "/placeholder.svg"
-            if product_listing and product_listing.get("image_ids"):
-                # Extract the string ID from the {"$oid": "..."} dictionary
-                first_image_id_item = product_listing["image_ids"][0]
-                if isinstance(first_image_id_item, dict) and "$oid" in first_image_id_item:
-                    first_image_id_str = first_image_id_item["$oid"]
-                elif isinstance(first_image_id_item, ObjectId):
-                    first_image_id_str = str(first_image_id_item)
-                elif isinstance(first_image_id_item, str):
-                    first_image_id_str = first_image_id_item
-                else:
-                    first_image_id_str = None # Fallback if unexpected type
-                if first_image_id_str:
-                    listing_id_str = str(product_listing["_id"])
-                    api_base_url = os.getenv('NEXT_PUBLIC_API_BASE_URL')
-                    if not api_base_url:
-                        print("DEBUG_ORDERS: WARNING: NEXT_PUBLIC_API_BASE_URL environment variable is not set. Using placeholder for image URL.")
-                        product_image_url = "/placeholder.svg"
+        orders = []
+        if artisan_listing_ids:
+            orders_cursor = db["orders"].find({"product_id": {"$in": artisan_listing_ids}}).sort("order_date", -1)
+            print(f"DEBUG_ORDERS: Querying orders with product_id in: {artisan_listing_ids}")
+            orders = await orders_cursor.to_list(None)
+            print(f"DEBUG_ORDERS: Raw orders fetched from DB: {orders}")
+        
+        # Combine and deduplicate orders from both sources
+        all_orders = []
+        processed_order_ids = set()
+        
+        # Process artist_orders first (new method)
+        for artist_order in artist_orders:
+            order_id = str(artist_order.get("order_id", artist_order.get("_id", "")))
+            if order_id not in processed_order_ids:
+                processed_order_ids.add(order_id)
+                
+                # Get product image from listings
+                product_image_url = "/placeholder.svg"
+                product_listing = await db["listings"].find_one({"_id": ObjectId(artist_order.get("product_id", ""))})
+                if product_listing and product_listing.get("image_ids"):
+                    first_image_id_item = product_listing["image_ids"][0]
+                    if isinstance(first_image_id_item, dict) and "$oid" in first_image_id_item:
+                        first_image_id_str = first_image_id_item["$oid"]
+                    elif isinstance(first_image_id_item, ObjectId):
+                        first_image_id_str = str(first_image_id_item)
+                    elif isinstance(first_image_id_item, str):
+                        first_image_id_str = first_image_id_item
                     else:
-                        product_image_url = f"{api_base_url}/api/listings/{listing_id_str}/images/{first_image_id_str}"
-                        print(f"DEBUG_ORDERS: Constructed image URL: {product_image_url}")
+                        first_image_id_str = None
+                    
+                    if first_image_id_str:
+                        listing_id_str = str(product_listing["_id"])
+                        api_base_url = os.getenv('NEXT_PUBLIC_API_BASE_URL')
+                        if api_base_url:
+                            product_image_url = f"{api_base_url}/api/listings/{listing_id_str}/images/{first_image_id_str}"
+                
+                all_orders.append({
+                    "id": order_id,
+                    "productTitle": artist_order.get("product_title", "Unknown Product"),
+                    "productImage": product_image_url,
+                    "buyer": artist_order.get("buyer_name", "Unknown Buyer"),
+                    "amount": f"₹{artist_order.get('total_amount', 0):.2f}",
+                    "status": artist_order.get("status", "pending"),
+                    "date": artist_order.get("order_date", datetime.utcnow()).isoformat(),
+                    "quantity": artist_order.get("quantity", 1),
+                    "shippingAddress": artist_order.get("shipping_address", "N/A"),
+                    "paymentMethod": artist_order.get("payment_method", "N/A"),
+                    "trackingNumber": artist_order.get("tracking_number", None),
+                    "estimatedDelivery": artist_order.get("estimated_delivery", "N/A"),
+                    "deliveredDate": artist_order.get("delivered_date", None),
+                })
+        
+        # Process existing orders (fallback for orders created before this feature)
+        for order_doc in orders:
+            order_id = str(order_doc["_id"])
+            if order_id not in processed_order_ids:
+                processed_order_ids.add(order_id)
+                print(f"DEBUG_ORDERS: Processing order_doc: {order_doc.get('_id')}, product_id: {order_doc.get('product_id')}")
+                
+                # Fetch product details (especially image_ids) from the listings collection
+                product_listing = await db["listings"].find_one({"_id": ObjectId(order_doc["product_id"])})
+                print(f"DEBUG_ORDERS: Fetched product listing for order: {product_listing.get('title') if product_listing else 'None'}")
+                product_image_url = "/placeholder.svg"
+                if product_listing and product_listing.get("image_ids"):
+                    # Extract the string ID from the {"$oid": "..."} dictionary
+                    first_image_id_item = product_listing["image_ids"][0]
+                    if isinstance(first_image_id_item, dict) and "$oid" in first_image_id_item:
+                        first_image_id_str = first_image_id_item["$oid"]
+                    elif isinstance(first_image_id_item, ObjectId):
+                        first_image_id_str = str(first_image_id_item)
+                    elif isinstance(first_image_id_item, str):
+                        first_image_id_str = first_image_id_item
+                    else:
+                        first_image_id_str = None # Fallback if unexpected type
+                    if first_image_id_str:
+                        listing_id_str = str(product_listing["_id"])
+                        api_base_url = os.getenv('NEXT_PUBLIC_API_BASE_URL')
+                        if not api_base_url:
+                            print("DEBUG_ORDERS: WARNING: NEXT_PUBLIC_API_BASE_URL environment variable is not set. Using placeholder for image URL.")
+                            product_image_url = "/placeholder.svg"
+                        else:
+                            product_image_url = f"{api_base_url}/api/listings/{listing_id_str}/images/{first_image_id_str}"
+                            print(f"DEBUG_ORDERS: Constructed image URL: {product_image_url}")
+                    else:
+                        print("DEBUG_ORDERS: No valid image ID extracted from product_listing['image_ids'][0]. Using placeholder.")
                 else:
-                    print("DEBUG_ORDERS: No valid image ID extracted from product_listing['image_ids'][0]. Using placeholder.")
-            else:
-                print("DEBUG_ORDERS: Product listing or image_ids missing. Using placeholder.")
-            serialized_orders.append({
-                "id": order_doc["_id"], # Use MongoDB _id as the order ID
-                "productTitle": product_listing.get("title", "Unknown Product") if product_listing else "Unknown Product",
-                "productImage": product_image_url,
-                "buyer": order_doc.get("buyer_name", "Unknown Buyer"), # Assuming buyer_name field
-                "amount": f"₹{order_doc.get('total_amount', 0):.2f}", # Assuming total_amount field
-                "status": order_doc.get("status", "pending"),
-                "date": order_doc.get("order_date", datetime.utcnow()).isoformat(),
-                "quantity": order_doc.get("quantity", 1),
-                # Add other relevant order fields here if they exist in your order model
-                "shippingAddress": order_doc.get("shipping_address", "N/A"),
-                "paymentMethod": order_doc.get("payment_method", "N/A"),
-                "trackingNumber": order_doc.get("tracking_number", None),
-                "estimatedDelivery": order_doc.get("estimated_delivery", "N/A"),
-                "deliveredDate": order_doc.get("delivered_date", None),
-            })
-        print(f"DEBUG_ORDERS: Final serialized orders count: {len(serialized_orders)}")
-        return serialized_orders
+                    print("DEBUG_ORDERS: Product listing or image_ids missing. Using placeholder.")
+                
+                all_orders.append({
+                    "id": order_id,
+                    "productTitle": product_listing.get("title", "Unknown Product") if product_listing else "Unknown Product",
+                    "productImage": product_image_url,
+                    "buyer": order_doc.get("buyer_name", "Unknown Buyer"),
+                    "amount": f"₹{order_doc.get('total_amount', 0):.2f}",
+                    "status": order_doc.get("status", "pending"),
+                    "date": order_doc.get("order_date", datetime.utcnow()).isoformat(),
+                    "quantity": order_doc.get("quantity", 1),
+                    "shippingAddress": order_doc.get("shipping_address", "N/A"),
+                    "paymentMethod": order_doc.get("payment_method", "N/A"),
+                    "trackingNumber": order_doc.get("tracking_number", None),
+                    "estimatedDelivery": order_doc.get("estimated_delivery", "N/A"),
+                    "deliveredDate": order_doc.get("delivered_date", None),
+                })
+        
+        print(f"DEBUG_ORDERS: Final combined orders count: {len(all_orders)}")
+        return all_orders
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e

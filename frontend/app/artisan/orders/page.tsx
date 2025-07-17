@@ -60,17 +60,17 @@ export default function ArtisanOrdersPage() {
           return
         }
 
-        // Change the endpoint to fetch orders where the artisan is the buyer
-        // This will use the /api/orders endpoint which expects an 'email' query parameter.
-        const response = await api.get<{ orders: Order[] }>(`/api/orders?email=${user.email}`, {
+        // Fetch orders for the logged-in artisan's products
+        // This will use the /api/artist/orders endpoint which returns orders for the artist's products
+        const response = await api.get<Order[]>(`/api/artist/orders`, {
           headers: {
-            Authorization: `Bearer ${token}`, // Still send token for authentication if needed by /api/orders
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         })
-        console.log("DEBUG_ARTISAN_BUYER_ORDERS: API response received:", response)
-        console.log("DEBUG_ARTISAN_BUYER_ORDERS: Orders array from API:", response.orders)
-        setOrders(response.orders || []) // The backend for /api/orders returns { orders: Order[] }
+        console.log("DEBUG_ARTISAN_ORDERS: API response received:", response)
+        console.log("DEBUG_ARTISAN_ORDERS: Orders array from API:", response)
+        setOrders(response || []) // The backend for /api/artist/orders returns Order[] directly
       } catch (error) {
         console.error("Error fetching artisan orders:", error)
         setOrders([]) // Clear orders on error

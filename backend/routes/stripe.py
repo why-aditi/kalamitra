@@ -60,6 +60,44 @@ async def create_checkout_session(
         # Insert order into database
         result = await orders_collection.insert_one(order_data)
         print(f"Order inserted with ID: {result.inserted_id}")
+        
+        # Add order to artist's "my orders" by finding artist_id from product_id
+        try:
+            listings_collection = db.get_collection("listings")
+            # Find the listing to get the artist_id
+            listing = await listings_collection.find_one({"_id": ObjectId(str(product.get("id", "")))})
+            if listing and listing.get("artist_id"):
+                artist_id = listing["artist_id"]
+                print(f"Adding order to artist's orders for artist_id: {artist_id}")
+                
+                # Create artist order entry
+                artist_order_data = {
+                    "order_id": str(result.inserted_id),
+                    "product_id": str(product.get("id", "")),
+                    "product_title": product.get("title", "Unknown Product"),
+                    "buyer_name": buyer.get("name", ""),
+                    "buyer_email": buyer["email"],
+                    "total_amount": float(product["price"]) * product.get("quantity", 1),
+                    "quantity": product.get("quantity", 1),
+                    "status": "confirmed",
+                    "order_date": datetime.utcnow(),
+                    "shipping_address": buyer.get("address", ""),
+                    "payment_method": "Card",
+                    "tracking_number": None,
+                    "estimated_delivery": estimated_delivery,
+                    "delivered_date": None,
+                    "artist_id": artist_id
+                }
+                
+                # Insert into artist_orders collection or update existing artist document
+                artist_orders_collection = db.get_collection("artist_orders")
+                await artist_orders_collection.insert_one(artist_order_data)
+                print(f"Order added to artist's orders successfully")
+            else:
+                print(f"Warning: Could not find listing or artist_id for product_id: {product.get('id', '')}")
+        except Exception as e:
+            print(f"Error adding order to artist's orders: {e}")
+            # Don't fail the main order creation if this fails
 
         # Create Stripe checkout session
         session = stripe.checkout.Session.create(
