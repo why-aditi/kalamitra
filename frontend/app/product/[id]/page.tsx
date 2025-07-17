@@ -245,11 +245,11 @@ export default function ProductDetail() {
         setIsOrderModalOpen(false)
 
         // Show success message
-        toast({
-          title: "Order Created Successfully!",
-          description: "Redirecting to payment page...",
-          variant: "default",
-        })
+        // toast({
+        //   title: "Order Created Successfully!",
+        //   description: "Redirecting to payment page...",
+        //   variant: "default",
+        // })
         // Small delay to show the toast, then redirect
         setTimeout(() => {
           window.location.href = data.url
@@ -642,8 +642,8 @@ export default function ProductDetail() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {product.reviews.map((review) => (
-                  <div key={review.id} className="border-b border-gray-100 pb-4 last:border-b-0">
+                {product.reviews.map((review, index) => (
+                  <div key={`${review.id || index}-${review.name}`} className="border-b border-gray-100 pb-4 last:border-b-0">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-800">{review.name}</span>
