@@ -18,22 +18,36 @@ router = APIRouter()
 # Re-using serialize_listing_doc from artist.py for consistency
 def serialize_listing_doc(listing_doc: dict) -> dict:
     """Helper function to serialize MongoDB listing document for Pydantic models"""
-    # Create a copy to avoid modifying the original document during serialization
-    serialized_doc = listing_doc.copy()
+    # Create a deep copy to avoid modifying the original document during serialization
+    import copy
+    serialized_doc = copy.deepcopy(listing_doc)
+    
+    # Helper function to recursively convert ObjectId to string
+    def convert_objectid_to_string(obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)
+        elif isinstance(obj, dict):
+            return {k: convert_objectid_to_string(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_objectid_to_string(item) for item in obj]
+        else:
+            return obj
+    
+    # Apply ObjectId conversion recursively
+    serialized_doc = convert_objectid_to_string(serialized_doc)
+    
     # CRUCIAL: Handle _id to 'id' mapping for Pydantic model
-    if "_id" in serialized_doc and isinstance(serialized_doc["_id"], ObjectId):
+    if "_id" in serialized_doc:
         serialized_doc["id"] = str(serialized_doc["_id"]) # Map _id to 'id'
         del serialized_doc["_id"] # Remove _id as Pydantic model uses 'id'
-    elif "_id" in serialized_doc: # If _id is already a string (e.g., from a previous serialization)
-        serialized_doc["id"] = str(serialized_doc["_id"])
-        del serialized_doc["_id"]
     else:
         # This case should ideally not happen for documents fetched from MongoDB
         serialized_doc["id"] = "missing_id_fallback" # Fallback for debugging
         print(f"DEBUG_LISTING: WARNING: Listing document missing _id. Using fallback.")
+    
     # Ensure image_ids is a list of strings
     if "image_ids" in serialized_doc and isinstance(serialized_doc["image_ids"], list):
-        serialized_doc["image_ids"] = [str(img_id) if isinstance(img_id, ObjectId) else str(img_id) for img_id in serialized_doc["image_ids"]]
+        serialized_doc["image_ids"] = [str(img_id) for img_id in serialized_doc["image_ids"]]
     else:
         serialized_doc["image_ids"] = [] # Default to empty list if not present or not a list
     # Ensure all other fields expected by Pydantic model are present with defaults
@@ -67,6 +81,9 @@ def serialize_listing_doc(listing_doc: dict) -> dict:
     serialized_doc["specifications"] = serialized_doc.get("specifications", {})
     serialized_doc["reviews"] = serialized_doc.get("reviews", [])
     serialized_doc["shippingInfo"] = serialized_doc.get("shippingInfo", {})
+    # Ensure artist_id is handled properly
+    if "artist_id" in serialized_doc and serialized_doc["artist_id"] is None:
+        serialized_doc["artist_id"] = None  # Keep as None, now allowed by the model
     return serialized_doc
 
 

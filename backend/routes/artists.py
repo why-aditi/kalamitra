@@ -81,6 +81,9 @@ def serialize_listing_doc(listing_doc: dict) -> dict:
     serialized_doc["specifications"] = serialized_doc.get("specifications", {})
     serialized_doc["reviews"] = serialized_doc.get("reviews", [])
     serialized_doc["shippingInfo"] = serialized_doc.get("shippingInfo", {})
+    # Ensure artist_id is handled properly
+    if "artist_id" in serialized_doc and serialized_doc["artist_id"] is None:
+        serialized_doc["artist_id"] = None  # Keep as None, now allowed by the model
     return serialized_doc
 
 @router.post("/artist/onboarding", response_model=ArtisanProfileResponse)

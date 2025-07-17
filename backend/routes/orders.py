@@ -6,15 +6,10 @@ from datetime import datetime
 import os
 from motor.motor_asyncio import AsyncIOMotorDatabase # Import for type hinting
 from services.database import Database # Import your Database service
+from pydantic import BaseModel
+from typing import List, Optional
 
 router = APIRouter()
-
-# REMOVE THESE LINES:
-# client = MongoClient(os.getenv("MONGODB_URI"))
-# db = client.get_database(os.getenv("MONGODB_DATABASE"))
-# orders_collection = db.get_collection("orders")
-# listings_collection = db.get_collection("listings")
-# users_collection = db.get_collection("users")
 
 @router.get("/orders")
 async def get_orders(email: str, db: AsyncIOMotorDatabase = Depends(Database.get_db)):
@@ -118,3 +113,36 @@ async def get_orders(email: str, db: AsyncIOMotorDatabase = Depends(Database.get
     except Exception as e:
         print(f"Error fetching orders: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch orders")
+
+
+class Order(BaseModel):
+    id: str
+    productTitle: str
+    productImage: str
+    buyer: str
+    amount: str
+    status: str
+    date: str
+    quantity: int
+    shippingAddress: str
+    paymentMethod: str
+    trackingNumber: Optional[str] = None
+    estimatedDelivery: Optional[str] = None
+    deliveredDate: Optional[str] = None
+
+    class Config:
+        json_encoders = {
+            ObjectId: str,
+            datetime: lambda dt: dt.isoformat()
+        }
+
+class OrdersResponse(BaseModel):
+    orders: List[Order]
+
+    class Config:
+        json_encoders = {
+            ObjectId: str,
+            datetime: lambda dt: dt.isoformat()
+        }
+
+

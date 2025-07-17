@@ -79,75 +79,6 @@ export default function Marketplace() {
   }, [searchParams, router]);
 
 
-  useEffect(() => {
-    async function fetchListings() {
-      setIsLoading(true);
-      try {
-        const skip = (currentPage - 1) * itemsPerPage;
-        const searchParams = new URLSearchParams({
-          skip: skip.toString(),
-          limit: itemsPerPage.toString(),
-          search: searchQuery,
-          min_price: priceRange[0].toString(),
-          max_price: priceRange[1].toString(),
-          category: selectedCraft,
-          state: selectedState
-        });
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${searchParams}`);
-        const data = await res.json();
-        const products = await Promise.all(
-          (data.listings as ListingFromApi[]).map(async (item: ListingFromApi) => {
-            let artistData: ArtistData = {};
-            try {
-              const artistId = item.artist_id ?? "";
-              console.log("Fetching artist data for ID:", artistId);
-              const artistRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/public/${artistId}`);
-              if (artistRes.ok) artistData = await artistRes.json();
-            } catch {
-              artistData = { name: "Traditional Artisan", region: "Unknown", state: "India" };
-            }
-
-            const suggestedPriceStr = (item.suggested_price ?? "299").toString();
-            const parsedPrice = parseInt(suggestedPriceStr.replace(/\D/g, "")) || 299;
-
-            return {
-              id: item._id,
-              title: item.title || "Untitled Product",
-              description: item.description || "No description available",
-              price: parsedPrice,
-              originalPrice: parsedPrice * 1.2,
-              image: item.image_ids?.[0]
-                ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${item._id}/images/${item.image_ids[0]}`
-                : "/placeholder.svg",
-              artisan: {
-                name: artistData.name || artistData.display_name || "Unknown",
-                location: `${artistData.region ?? "Unknown"}, ${artistData.state ?? "India"}`,
-                rating: 4.8,
-                craft: item.category ?? "Art",
-                verified: true,
-              },
-              category: item.category ?? "Art",
-              tags: item.tags || [],
-              inStock: item.status === "active",
-              featured: Math.random() > 0.7,
-              trending: Math.random() > 0.8,
-              reviews: Math.floor(Math.random() * 50) + 10,
-              soldCount: Math.floor(Math.random() * 100) + 20,
-            };
-          })
-        );
-        setProducts(products);
-        setFilteredProducts(products);
-        setTotalCount(data.total || 0);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchListings();
-  }, [currentPage]);
-
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
@@ -169,7 +100,18 @@ export default function Marketplace() {
           state: selectedState
         });
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${searchParams}`);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const data = await res.json();
+        
+        // Check if data has the expected structure
+        if (!data.listings || !Array.isArray(data.listings)) {
+          throw new Error('Invalid response structure from API');
+        }
+        
         const products = await Promise.all(
           (data.listings as ListingFromApi[]).map(async (item: ListingFromApi) => {
             let artistData: ArtistData = {};
@@ -214,8 +156,13 @@ export default function Marketplace() {
         setProducts(products);
         setFilteredProducts(products);
         setTotalCount(data.total || 0);
+        setError(null); // Clear any previous errors
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching listings:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch listings');
+        setProducts([]);
+        setFilteredProducts([]);
+        setTotalCount(0);
       } finally {
         setIsLoading(false);
       }

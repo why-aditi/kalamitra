@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from bson import ObjectId
 
 class Listing(BaseModel):
     # CRUCIAL CHANGE: Use 'id' as the primary identifier in Pydantic, aliasing MongoDB's '_id'
@@ -15,7 +16,7 @@ class Listing(BaseModel):
     story: str = ""
     image_ids: List[str] = [] # Ensure this is List[str]
 
-    artist_id: str
+    artist_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     status: str = "active"
@@ -36,7 +37,10 @@ class Listing(BaseModel):
     class Config:
         populate_by_name = True # Allows Pydantic to map by field name or alias (e.g., _id to id)
         arbitrary_types_allowed = True # Allows types like datetime
-        json_encoders = {datetime: lambda dt: dt.isoformat()} # Encodes datetime to ISO format for JSON
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat(),
+            ObjectId: str  # Convert ObjectId to string for JSON serialization
+        }
         # CRUCIAL: Allow extra fields in the database document that are not explicitly defined in the model.
         # This prevents validation errors if your MongoDB documents have more fields than your Pydantic model.
         extra = "allow"
@@ -46,6 +50,12 @@ class ListingsResponse(BaseModel):
     total: int
     limit: int
     skip: int
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat(),
+            ObjectId: str  # Convert ObjectId to string for JSON serialization
+        }
 
 class Order(BaseModel):
     id: str
