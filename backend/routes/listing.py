@@ -93,7 +93,7 @@ async def get_listings(
     limit: int = 100,
     search: str = "",
     min_price: float = 0,
-    max_price: float = 50000,
+    max_price: float = 20000,
     category: str = "all",
     state: str = "all", # Assuming 'state' is a filter for listings
     db: AsyncIOMotorDatabase = Depends(Database.get_db)):
@@ -112,7 +112,7 @@ async def get_listings(
 
         # Price range filter (using the 'price' field which is float)
         # Assuming 'price' field is already a float in DB or handled by serialize_listing_doc
-        if min_price > 0 or max_price < 50000:
+        if min_price > 0 or max_price < 20000:
             filter_query["price"] = {"$gte": min_price, "$lte": max_price}
 
         # Category filter

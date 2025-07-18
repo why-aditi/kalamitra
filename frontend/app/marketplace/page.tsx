@@ -58,9 +58,17 @@ export default function Marketplace() {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [priceRange, setPriceRange] = useState([0, 50000]);
-  const [selectedCraft, setSelectedCraft] = useState("all");
-  const [selectedState, setSelectedState] = useState("all");
+  
+  // Separate filter states for UI and applied filters
+  const [tempPriceRange, setTempPriceRange] = useState([0, 20000]);
+  const [tempSelectedCraft, setTempSelectedCraft] = useState("all");
+  const [tempSelectedState, setTempSelectedState] = useState("all");
+  
+  // Applied filter states (used for API calls)
+  const [appliedPriceRange, setAppliedPriceRange] = useState([0, 20000]);
+  const [appliedSelectedCraft, setAppliedSelectedCraft] = useState("all");
+  const [appliedSelectedState, setAppliedSelectedState] = useState("all");
+  
   const [viewMode, setViewMode] = useState("grid");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,13 +86,12 @@ export default function Marketplace() {
     }
   }, [searchParams, router]);
 
-
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, priceRange, selectedCraft, selectedState]);
+  }, [searchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
 
-  // Fetch listings when page or filters change
+  // Fetch listings when page or applied filters change
   useEffect(() => {
     async function fetchListings() {
       setIsLoading(true);
@@ -94,10 +101,10 @@ export default function Marketplace() {
           skip: skip.toString(),
           limit: itemsPerPage.toString(),
           search: searchQuery,
-          min_price: priceRange[0].toString(),
-          max_price: priceRange[1].toString(),
-          category: selectedCraft,
-          state: selectedState
+          min_price: appliedPriceRange[0].toString(),
+          max_price: appliedPriceRange[1].toString(),
+          category: appliedSelectedCraft,
+          state: appliedSelectedState
         });
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${searchParams}`);
         
@@ -132,7 +139,7 @@ export default function Marketplace() {
               title: item.title || "Untitled Product",
               description: item.description || "No description available",
               price: parsedPrice,
-              originalPrice: parsedPrice * 1.2,
+              originalPrice: Math.round(parsedPrice * 1.2),
               image: item.image_ids?.[0]
                 ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${item._id}/images/${item.image_ids[0]}`
                 : "/placeholder.svg",
@@ -168,7 +175,7 @@ export default function Marketplace() {
       }
     }
     fetchListings();
-  }, [currentPage, searchQuery, priceRange, selectedCraft, selectedState]);
+  }, [currentPage, searchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
 
   const crafts = [...new Set(products.map((p) => p.category.toLowerCase()))];
   const states = [...new Set(products.map((p) => p.artisan.location.split(",")[1]?.trim().toLowerCase()))];
@@ -176,6 +183,22 @@ export default function Marketplace() {
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const target = e.target as HTMLImageElement;
     target.src = "/placeholder.svg";
+  };
+
+  const handleApplyFilters = () => {
+    setAppliedPriceRange(tempPriceRange);
+    setAppliedSelectedCraft(tempSelectedCraft);
+    setAppliedSelectedState(tempSelectedState);
+  };
+
+  const handleClearFilters = () => {
+    setTempPriceRange([0, 20000]);
+    setTempSelectedCraft("all");
+    setTempSelectedState("all");
+    setAppliedPriceRange([0, 20000]);
+    setAppliedSelectedCraft("all");
+    setAppliedSelectedState("all");
+    setSearchQuery("");
   };
 
   return (
@@ -283,21 +306,26 @@ export default function Marketplace() {
                       {/* Price Range */}
                       <div>
                         <label className="text-sm font-semibold text-gray-700 mb-3 block">
-                          Price Range: ₹{priceRange[0]} - ₹{priceRange[1]}
+                          Price Range: ₹{tempPriceRange[0]} - ₹{tempPriceRange[1]}
                         </label>
                         <Slider
-                          value={priceRange}
-                          onValueChange={setPriceRange}
-                          max={5000}
-                          step={100}
+                          value={tempPriceRange}
+                          onValueChange={setTempPriceRange}
+                          max={20000}
+                          min={0}
+                          step={500}
                           className="w-full"
                         />
+                        <div className="flex justify-between text-xs text-gray-500 mt-2">
+                          <span>₹0</span>
+                          <span>₹20,000</span>
+                        </div>
                       </div>
 
                       {/* Craft Type */}
                       <div>
                         <label className="text-sm font-semibold text-gray-700 mb-3 block">Category</label>
-                        <Select value={selectedCraft} onValueChange={setSelectedCraft}>
+                        <Select value={tempSelectedCraft} onValueChange={setTempSelectedCraft}>
                           <SelectTrigger className="border-orange-200 focus:border-orange-400">
                             <SelectValue placeholder="All categories" />
                           </SelectTrigger>
@@ -315,7 +343,7 @@ export default function Marketplace() {
                       {/* State */}
                       <div>
                         <label className="text-sm font-semibold text-gray-700 mb-3 block">Location</label>
-                        <Select value={selectedState} onValueChange={setSelectedState}>
+                        <Select value={tempSelectedState} onValueChange={setTempSelectedState}>
                           <SelectTrigger className="border-orange-200 focus:border-orange-400">
                             <SelectValue placeholder="All locations" />
                           </SelectTrigger>
@@ -330,18 +358,22 @@ export default function Marketplace() {
                         </Select>
                       </div>
 
-                      <Button
-                        variant="outline"
-                        className="w-full border-orange-300 text-orange-600 hover:bg-orange-50 bg-transparent"
-                        onClick={() => {
-                          setSearchQuery("")
-                          setPriceRange([0, 5000])
-                          setSelectedCraft("all")
-                          setSelectedState("all")
-                        }}
-                      >
-                        Clear All Filters
-                      </Button>
+                      {/* Filter Action Buttons */}
+                      <div className="space-y-3">
+                        <Button
+                          onClick={handleApplyFilters}
+                          className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                        >
+                          Apply Filters
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full border-orange-300 text-orange-600 hover:bg-orange-50 bg-transparent"
+                          onClick={handleClearFilters}
+                        >
+                          Clear All Filters
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -421,36 +453,36 @@ export default function Marketplace() {
                   </Card>
                 ) : (
                   <div
-                    className={`grid gap-8 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
+                    className={`grid gap-6 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"
                       }`}
                   >
                     {filteredProducts.map((product) => (
                       <Card
                         key={product.id}
                         id={`product-${product.id}`}
-                        className="group border-2 border-orange-200 hover:border-orange-300 transition-all duration-300 hover:shadow-2xl bg-white/90 backdrop-blur-sm overflow-hidden"
+                        className="group border-2 border-orange-200 hover:border-orange-300 transition-all duration-300 hover:shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden"
                       >
                         <div className={`${viewMode === "grid" ? "" : "flex"}`}>
                           <div
-                            className={`relative overflow-hidden ${viewMode === "grid" ? "aspect-square" : "w-64 h-64 flex-shrink-0"
+                            className={`relative overflow-hidden ${viewMode === "grid" ? "aspect-[4/3]" : "w-48 h-48 flex-shrink-0"
                               }`}
                           >
                             <img
                               src={product.image}
                               alt={product.title}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               onError={handleImageError}
                             />
                             {/* Overlay Badges */}
-                            <div className="absolute top-3 left-3 flex flex-col gap-2">
+                            <div className="absolute top-2 left-2 flex flex-col gap-1">
                               {product.featured && (
-                                <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg">
+                                <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg text-xs">
                                   <Sparkles className="w-3 h-3 mr-1" />
                                   Featured
                                 </Badge>
                               )}
                               {product.trending && (
-                                <Badge className="bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg">
+                                <Badge className="bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg text-xs">
                                   <TrendingUp className="w-3 h-3 mr-1" />
                                   Trending
                                 </Badge>
@@ -460,23 +492,23 @@ export default function Marketplace() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 hover:bg-white shadow-lg rounded-full p-2"
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 hover:bg-white shadow-lg rounded-full p-1.5"
                             >
-                              <Heart className="w-5 h-5 text-gray-600 hover:text-red-500" />
+                              <Heart className="w-4 h-4 text-gray-600 hover:text-red-500" />
                             </Button>
 
                             {/* Discount Badge */}
                             {product.originalPrice > product.price && (
-                              <Badge className="absolute bottom-3 right-3 bg-red-500 text-white shadow-lg">
+                              <Badge className="absolute bottom-2 right-2 bg-red-500 text-white shadow-lg text-xs">
                                 {Math.round((1 - product.price / product.originalPrice) * 100)}% OFF
                               </Badge>
                             )}
                           </div>
 
-                          <CardContent className={`${viewMode === "grid" ? "p-6" : "p-8 flex-1"}`}>
-                            <div className="space-y-4">
+                          <CardContent className={`${viewMode === "grid" ? "p-4" : "p-6 flex-1"}`}>
+                            <div className="space-y-3">
                               <div>
-                                <h3 className="font-bold text-gray-800 text-lg line-clamp-2 group-hover:text-orange-600 transition-colors mb-2">
+                                <h3 className="font-semibold text-gray-800 text-base line-clamp-2 group-hover:text-orange-600 transition-colors mb-1">
                                   {product.title}
                                 </h3>
                                 <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed">
@@ -485,73 +517,52 @@ export default function Marketplace() {
                               </div>
 
                               {/* Artisan Info */}
-                              <div className="flex items-center gap-2 text-sm">
+                              <div className="flex items-center gap-2 text-xs">
                                 <div className="flex items-center gap-1 text-gray-600">
-                                  <MapPin className="w-4 h-4" />
-                                  <span className="font-medium">{product.artisan.name}</span>
+                                  <MapPin className="w-3 h-3" />
+                                  <span className="font-medium truncate">{product.artisan.name}</span>
                                   {product.artisan.verified && (
-                                    <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                                    <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
                                       <span className="text-white text-xs">✓</span>
                                     </div>
                                   )}
                                 </div>
-                                <span className="text-gray-400">•</span>
-                                <span className="text-gray-500">{product.artisan.location}</span>
                               </div>
 
                               {/* Rating & Reviews */}
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-1">
-                                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-sm font-semibold">{product.artisan.rating}</span>
-                                  </div>
-                                  <span className="text-sm text-gray-500">({product.reviews} reviews)</span>
+                                <div className="flex items-center gap-1">
+                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-xs font-semibold">{product.artisan.rating}</span>
+                                  <span className="text-xs text-gray-500">({product.reviews})</span>
                                 </div>
-                                <span className="text-xs text-gray-500">{product.soldCount} sold</span>
-                              </div>
-
-                              {/* Tags */}
-                              <div className="flex flex-wrap gap-2">
-                                {product.tags.slice(0, 3).map((tag) => (
-                                  <Badge
-                                    key={tag}
-                                    variant="secondary"
-                                    className="text-xs bg-orange-50 text-orange-700 border-orange-200"
-                                  >
-                                    {tag}
-                                  </Badge>
-                                ))}
+                                <Badge variant="outline" className="border-orange-200 text-orange-700 text-xs">
+                                  {product.category}
+                                </Badge>
                               </div>
 
                               {/* Price and Buy Now Button */}
                               <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-2xl font-bold text-orange-600">₹{product.price}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg font-bold text-orange-600">₹{product.price}</span>
                                   {product.originalPrice > product.price && (
-                                    <span className="text-sm text-gray-500 line-through">₹{product.originalPrice}</span>
+                                    <span className="text-xs text-gray-500 line-through">₹{product.originalPrice}</span>
                                   )}
                                 </div>
-                                <div className="flex flex-col items-end gap-2">
-                                  <Badge variant="outline" className="border-orange-200 text-orange-700 mb-2">
-                                    {product.category}
-                                  </Badge>
-                                  <Button
-                                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 text-sm font-semibold shadow"
-                                    onClick={() => {
-                                      if (!profile) {
-                                        window.location.href = "/buyer/login";
-                                        return;
-                                      }
-                                      window.location.href = `/product/${product.id}`;
-                                    }}
-                                  >
-                                    Buy Now
-                                  </Button>
-
-                                </div>
+                                <Button
+                                  size="sm"
+                                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-3 py-1.5 text-xs font-semibold shadow"
+                                  onClick={() => {
+                                    if (!profile) {
+                                      window.location.href = "/buyer/login";
+                                      return;
+                                    }
+                                    window.location.href = `/product/${product.id}`;
+                                  }}
+                                >
+                                  Buy Now
+                                </Button>
                               </div>
-
                             </div>
                           </CardContent>
                         </div>
