@@ -13,11 +13,15 @@ def construct_image_urls(listing_id: str, image_ids: List[str]) -> List[str]:
     Returns:
         List of full image URLs
     """
+    # Try to get API base URL from environment variable, with fallback for production
     api_base_url = os.getenv('NEXT_PUBLIC_API_BASE_URL')
     
+    # Fallback to production URL if environment variable is not set
     if not api_base_url:
-        print(f"WARNING: NEXT_PUBLIC_API_BASE_URL environment variable is not set. Using placeholder images.")
-        return ["/placeholder.svg"] * len(image_ids)
+        api_base_url = "https://kalamitra-backend-latest.onrender.com"
+        print(f"WARNING: NEXT_PUBLIC_API_BASE_URL environment variable is not set. Using fallback: {api_base_url}")
+    
+    print(f"DEBUG: Using API base URL: {api_base_url}")
     
     full_image_urls = []
     
