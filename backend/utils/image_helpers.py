@@ -1,6 +1,10 @@
 import os
 from typing import List
 from bson import ObjectId
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 def construct_image_urls(listing_id: str, image_ids: List[str]) -> List[str]:
     """
