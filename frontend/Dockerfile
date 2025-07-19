@@ -5,17 +5,14 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Copy the rest of the application
+# Copy the entire project
 COPY . .
 
+# Install dependencies
+RUN pnpm install --no-frozen-lockfile
+
 # Build the application
-RUN pnpm build
+RUN pnpm run build
 
 # Expose the port the app runs on
 EXPOSE 3000

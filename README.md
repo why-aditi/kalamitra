@@ -69,10 +69,10 @@ uvicorn main:app --reload
 
 ```bash
 cd frontend
-pnpm install
+npm install
 cp env.example .env
 # Update .env with your configuration
-pnpm run dev
+npm run dev
 ```
 
 ## Project Structure
