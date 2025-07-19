@@ -77,7 +77,7 @@ export default function Marketplace() {
   const [isSearching, setIsSearching] = useState(false);
   
   // Debounce search query to avoid API calls on every keystroke
-  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const debouncedSearchQuery = useDebounce(searchQuery, 300); // Reduced from 500ms to 300ms
   
   // Separate filter states for UI and applied filters
   const [tempPriceRange, setTempPriceRange] = useState([0, 20000]);
@@ -106,18 +106,23 @@ export default function Marketplace() {
     }
   }, [searchParams, router]);
 
-  // Reset page when filters change
+  // Reset page when search query or applied filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
 
-  // Fetch listings when page or applied filters change
+  // Fetch listings when page, search query, or applied filters change
   const fetchListings = useCallback(async () => {
-    setIsLoading(true);
-    setIsSearching(true);
+    // Don't show loading for search - only show searching indicator
+    if (debouncedSearchQuery.length > 0) {
+      setIsSearching(true);
+    } else {
+      setIsLoading(true);
+    }
+    
     try {
       const skip = (currentPage - 1) * itemsPerPage;
-      const searchParams = new URLSearchParams({
+      const params = new URLSearchParams({
         skip: skip.toString(),
         limit: itemsPerPage.toString(),
         search: debouncedSearchQuery,
@@ -126,7 +131,13 @@ export default function Marketplace() {
         category: appliedSelectedCraft,
         state: appliedSelectedState
       });
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${searchParams}`);
+
+      // Remove empty or 'all' values to clean up the API call
+      if (!debouncedSearchQuery.trim()) params.delete('search');
+      if (appliedSelectedCraft === 'all') params.delete('category');
+      if (appliedSelectedState === 'all') params.delete('state');
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${params}`);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
@@ -236,11 +247,23 @@ export default function Marketplace() {
     setSearchQuery(query);
   }, []);
 
+  // Handle search input with proper event prevention
+  const handleSearchInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    setSearchQuery(e.target.value);
+  }, []);
+
+  // Handle search form submission (prevent default form behavior)
+  const handleSearchSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    // The search will be triggered by the useEffect watching debouncedSearchQuery
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
       <div className="container mx-auto px-4 py-8">
-        {/* Loading and Error States */}
-        {isLoading && (
+        {/* Initial Loading State (only show on first load) */}
+        {isLoading && allProducts.length === 0 && (
           <div className="text-center py-16">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mb-4"></div>
             <p className="text-lg text-gray-700">Loading handcrafted treasures...</p>
@@ -262,8 +285,8 @@ export default function Marketplace() {
           </div>
         )}
 
-        {/* Hero Search Section */}
-        {!isLoading && (
+        {/* Hero Search Section - Always show unless initial loading */}
+        {!(isLoading && allProducts.length === 0) && (
           <>
             <div className="text-center mb-12">
               <div className="max-w-4xl mx-auto">
@@ -278,14 +301,15 @@ export default function Marketplace() {
                   Support local artisans and find unique handcrafted products from across India
                 </p>
 
-                {/* Search Bar */}
-                <div className="max-w-3xl mx-auto relative mb-8">
+                {/* Search Bar with Form */}
+                <form onSubmit={handleSearchSubmit} className="max-w-3xl mx-auto relative mb-8">
                   <div className="relative">
                     <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400 w-6 h-6" />
                     <Input
+                      type="text"
                       placeholder="Search handmade products, artisans, or locations..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={handleSearchInput}
                       className="pl-16 pr-20 py-6 text-lg border-2 border-orange-200 focus:border-orange-400 rounded-2xl bg-white/80 backdrop-blur-sm shadow-lg"
                     />
                     {isSearching && (
@@ -294,7 +318,7 @@ export default function Marketplace() {
                       </div>
                     )}
                   </div>
-                </div>
+                </form>
 
                 {/* Quick Filter Tags */}
                 <div className="flex flex-wrap justify-center gap-3 mb-8">
@@ -401,12 +425,14 @@ export default function Marketplace() {
                       {/* Filter Action Buttons */}
                       <div className="space-y-3">
                         <Button
+                          type="button"
                           onClick={handleApplyFilters}
                           className="w-full bg-orange-500 hover:bg-orange-600 text-white"
                         >
                           Apply Filters
                         </Button>
                         <Button
+                          type="button"
                           variant="outline"
                           className="w-full border-orange-300 text-orange-600 hover:bg-orange-50 bg-transparent"
                           onClick={handleClearFilters}
@@ -428,12 +454,13 @@ export default function Marketplace() {
                       {debouncedSearchQuery ? `Results for "${debouncedSearchQuery}"` : "All Products"}
                     </h2>
                     <p className="text-gray-600 mt-1">
-                      {filteredProducts.length} handcrafted treasures found
+                      {totalCount} handcrafted treasures found
                       {isSearching && " (searching...)"}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <Button
+                      type="button"
                       variant={viewMode === "grid" ? "default" : "outline"}
                       size="sm"
                       onClick={() => setViewMode("grid")}
@@ -446,6 +473,7 @@ export default function Marketplace() {
                       <Grid className="w-4 h-4" />
                     </Button>
                     <Button
+                      type="button"
                       variant={viewMode === "list" ? "default" : "outline"}
                       size="sm"
                       onClick={() => setViewMode("list")}
@@ -463,9 +491,10 @@ export default function Marketplace() {
                 {/* Pagination Controls */}
                 <div className="flex justify-center items-center gap-4 mb-8">
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1 || isLoading}
+                    disabled={currentPage === 1 || isLoading || isSearching}
                     className="border-orange-300 text-orange-600 hover:bg-orange-50"
                   >
                     Previous
@@ -474,9 +503,10 @@ export default function Marketplace() {
                     Page {currentPage} of {Math.ceil(totalCount / itemsPerPage)}
                   </span>
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={() => setCurrentPage(prev => prev + 1)}
-                    disabled={currentPage >= Math.ceil(totalCount / itemsPerPage) || isLoading}
+                    disabled={currentPage >= Math.ceil(totalCount / itemsPerPage) || isLoading || isSearching}
                     className="border-orange-300 text-orange-600 hover:bg-orange-50"
                   >
                     Next
@@ -494,7 +524,7 @@ export default function Marketplace() {
                     </div>
                   )}
                   
-                  {filteredProducts.length === 0 && !isSearching ? (
+                  {filteredProducts.length === 0 && !isSearching && !isLoading ? (
                     <Card className="border-2 border-orange-200 bg-white/80 backdrop-blur-sm">
                       <CardContent className="p-16 text-center">
                         <Search className="w-20 h-20 text-gray-400 mx-auto mb-6" />
@@ -543,6 +573,7 @@ export default function Marketplace() {
                               </div>
 
                               <Button
+                                type="button"
                                 variant="ghost"
                                 size="sm"
                                 className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 hover:bg-white shadow-lg rounded-full p-1.5"
@@ -603,6 +634,7 @@ export default function Marketplace() {
                                     )}
                                   </div>
                                   <Button
+                                    type="button"
                                     size="sm"
                                     className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-3 py-1.5 text-xs font-semibold shadow"
                                     onClick={() => {
