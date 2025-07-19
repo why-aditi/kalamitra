@@ -4,28 +4,52 @@ The frontend application for Kalamitra, built with Next.js 14, TypeScript, and T
 
 ## Prerequisites
 
+### Docker Setup (Recommended)
+- Docker
+- Docker Compose
+
+### Manual Setup
 - Node.js 18.x or higher
-- npm 8.x or higher
+- pnpm 8.x or higher
 
 ## Getting Started
 
-1. Clone the repository
-2. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-3. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-4. Copy the environment variables:
+### Docker Setup (Recommended)
+
+1. Set up environment variables:
    ```bash
    cp env.example .env
    ```
-5. Update the `.env` file with your configuration
-6. Start the development server:
+
+2. Build and run with Docker Compose:
    ```bash
-   npm run dev
+   # From the project root directory
+   docker-compose up --build
+   ```
+   The application will be available at `http://localhost:3000`
+
+### Manual Setup
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+
+2. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+
+3. Copy the environment variables:
+   ```bash
+   cp env.example .env
+   ```
+
+4. Update the `.env` file with your configuration
+
+5. Start the development server:
+   ```bash
+   pnpm run dev
    ```
 
 ## Project Structure
@@ -55,6 +79,7 @@ The frontend application for Kalamitra, built with Next.js 14, TypeScript, and T
 - Firebase Authentication
 - Cloudinary for image storage
 - Responsive design
+- Docker containerization
 
 ## Development Guidelines
 
@@ -131,14 +156,30 @@ NEXT_PUBLIC_CLOUDINARY_API_SECRET=
 
 ## Deployment
 
+### Docker Deployment (Recommended)
+
+1. Build and run with Docker Compose:
+   ```bash
+   docker-compose up --build -d
+   ```
+
+2. Monitor the logs:
+   ```bash
+   docker-compose logs -f frontend
+   ```
+
+### Manual Deployment
+
 1. Build the application:
    ```bash
    pnpm build
    ```
+
 2. Test the production build:
    ```bash
-   npm run dev
+   pnpm start
    ```
+
 3. Deploy to your hosting platform of choice
 
 ## Contributing
@@ -151,16 +192,26 @@ NEXT_PUBLIC_CLOUDINARY_API_SECRET=
 
 ## Troubleshooting
 
+### Docker Issues
+
+1. **Container not starting**
+   - Check Docker logs: `docker-compose logs frontend`
+   - Verify environment variables
+   - Check port availability
+
+2. **API Connection**
+   - Ensure backend container is running
+   - Check API URL in `.env`
+   - Verify network connectivity between containers
+
 ### Common Issues
 
 1. **Build Errors**
-
    - Clear `.next` directory
    - Remove `node_modules` and reinstall
    - Check Node.js version
 
 2. **API Connection**
-
    - Verify API URL in `.env`
    - Check CORS configuration
    - Validate authentication tokens

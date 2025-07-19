@@ -1,0 +1,41 @@
+# Version control
+.git
+.gitignore
+
+# Docker
+.docker
+**/Dockerfile
+**/docker-compose.yml
+
+# Environment variables
+**/.env*
+
+# Dependencies
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Build outputs
+**/dist
+**/build
+**/.next
+
+# Development files
+**/.vscode
+**/.idea
+**/*.log
+
+# Documentation
+**/*.md
+**/docs
+
+# Test files
+**/*test*
+**/*spec*
+
+# Temporary files
+**/*.swp
+**/*.swo
+**/.DS_Store

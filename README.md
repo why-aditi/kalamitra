@@ -24,14 +24,35 @@ The project consists of two main components:
 
 ## Quick Start
 
-1. Clone the repository:
+### Using Docker (Recommended)
 
+1. Clone the repository:
 ```bash
 git clone <repository-url>
 cd kalamitra-mvp
 ```
 
-2. Set up the backend:
+2. Set up environment variables:
+```bash
+# Frontend
+cp frontend/env.example frontend/.env
+# Backend
+cp backend/.env.example backend/.env
+```
+
+3. Build and run with Docker Compose:
+```bash
+docker-compose up --build
+```
+
+The services will be available at:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- MongoDB: localhost:27017
+
+### Manual Setup
+
+1. Set up the backend:
 
 ```bash
 cd backend
@@ -44,14 +65,14 @@ cp .env.example .env
 uvicorn main:app --reload
 ```
 
-3. Set up the frontend:
+2. Set up the frontend:
 
 ```bash
 cd frontend
-npm install
+pnpm install
 cp env.example .env
 # Update .env with your configuration
-npm run dev
+pnpm run dev
 ```
 
 ## Project Structure
@@ -81,6 +102,7 @@ npm run dev
 - MongoDB database
 - Cloudinary for image storage
 - Responsive design
+- Docker containerization for easy deployment
 
 ## Development Guidelines
 
@@ -129,8 +151,8 @@ NEXT_PUBLIC_CLOUDINARY_API_KEY=
 
 ```env
 # MongoDB Configuration
-MONGODB_URI=
-DATABASE_NAME=
+MONGODB_URI=mongodb://mongodb:27017/kalamitra
+DATABASE_NAME=kalamitra
 
 # Firebase Configuration
 FIREBASE_CREDENTIALS_PATH=
