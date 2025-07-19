@@ -3,11 +3,15 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from datetime import datetime, timedelta
 import asyncio
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Configuration ---
 # IMPORTANT: Replace with your MongoDB connection string
-MONGO_URI = "mongodb+srv://aditi25kala:Meesho123@cluster0.qf3xtrq.mongodb.net/" # Your provided URI
-DATABASE_NAME = "kalamitra" # Your provided database name
+MONGO_URI = os.getenv("MONGO_URI") # Your provided URI
+
+DATABASE_NAME = os.getenv("DATABASE_NAME") # Your provided database name
 
 async def seed_orders_data():
     client = None
