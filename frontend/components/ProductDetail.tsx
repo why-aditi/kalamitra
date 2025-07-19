@@ -119,7 +119,7 @@ export default function ProductDetail() {
   if (!listingId || typeof listingId !== "string") {
     throw new Error("Invalid listing ID")
   }
-  const imageIds: string[] = product?.image_ids ?? []
+  const images: string[] = product?.images ?? []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
@@ -153,24 +153,20 @@ export default function ProductDetail() {
           <div className="space-y-4">
             <div className="aspect-square rounded-lg overflow-hidden border border-orange-200">
               <img
-                // --- CHANGE THIS LINE ---
-                src={`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${listingId}/images/${imageIds[selectedImage]}`}
-                // --- END CHANGE ---
+                src={images[selectedImage] || "/placeholder.svg"}
                 alt={product.title}
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {imageIds.map((imageId: string, index: number) => (
+              {images.map((imageUrl: string, index: number) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
                   className={`aspect-square rounded-lg overflow-hidden border-2 ${selectedImage === index ? "border-orange-500" : "border-gray-200"}`}
                 >
                   <img
-                    // --- CHANGE THIS LINE ---
-                    src={`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${listingId}/images/${imageId}`}
-                    // --- END CHANGE ---
+                    src={imageUrl || "/placeholder.svg"}
                     alt={`Product ${index + 1}`}
                     className="w-full h-full object-cover"
                   />

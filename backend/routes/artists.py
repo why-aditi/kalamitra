@@ -7,6 +7,7 @@ from models.listingModel import Listing, ListingsResponse # Ensure Listing and L
 from services.database import Database
 from datetime import datetime # CRUCIAL: Import datetime
 from bson import ObjectId # CRUCIAL: Import ObjectId for explicit conversion
+from utils.image_helpers import construct_image_urls, get_first_image_url
 import os
 
 router = APIRouter()
@@ -218,22 +219,16 @@ async def get_artist_listings(current_user: dict = Depends(check_artist_role)):
         serialized_listings = []
         for listing_doc in listings:
             serialized_doc = serialize_listing_doc(listing_doc)
-                        # --- CRITICAL CHANGE FOR LISTINGS IMAGES ---
-            # Construct full image URLs for the 'images' array
-            full_image_urls = []
-            if "image_ids" in serialized_doc and isinstance(serialized_doc["image_ids"], list):
-                for img_id in serialized_doc["image_ids"]:
-                    # Ensure listing_id is available and is a string
-                    listing_id_str = serialized_doc.get("id") # 'id' is already a string from serialize_listing_doc
-                    if listing_id_str:
-                        api_base_url = os.getenv('NEXT_PUBLIC_API_BASE_URL')
-                        if not api_base_url:
-                            print("DEBUG_ARTIST_LISTINGS: WARNING: NEXT_PUBLIC_API_BASE_URL environment variable is not set. Using placeholder for image URL.")
-                            full_image_urls.append("/placeholder.svg") # Fallback to generic placeholder
-                        else:
-                            full_image_urls.append(f"{api_base_url}/api/listings/{listing_id_str}/images/{img_id}")
-                    else:
-                        print(f"DEBUG_ARTIST_LISTINGS: WARNING: Listing ID missing for image {img_id}. Cannot construct full URL.")
+            # --- CRITICAL CHANGE FOR LISTINGS IMAGES ---
+            # Construct full image URLs for the 'images' array using helper function
+            listing_id_str = serialized_doc.get("id") # 'id' is already a string from serialize_listing_doc
+            image_ids = serialized_doc.get("image_ids", [])
+            
+            if listing_id_str and image_ids:
+                full_image_urls = construct_image_urls(listing_id_str, image_ids)
+            else:
+                full_image_urls = ["/placeholder.svg"]
+            
             serialized_doc["images"] = full_image_urls # Assign the constructed URLs to the 'images' field
             try:
                 pydantic_listing = Listing(**serialized_doc)
@@ -308,9 +303,7 @@ async def get_artist_orders(current_user: dict = Depends(check_artist_role)):
                     
                     if first_image_id_str:
                         listing_id_str = str(product_listing["_id"])
-                        api_base_url = os.getenv('NEXT_PUBLIC_API_BASE_URL')
-                        if api_base_url:
-                            product_image_url = f"{api_base_url}/api/listings/{listing_id_str}/images/{first_image_id_str}"
+                        product_image_url = get_first_image_url(listing_id_str, [first_image_id_str])
                 
                 all_orders.append({
                     "id": order_id,
@@ -352,13 +345,8 @@ async def get_artist_orders(current_user: dict = Depends(check_artist_role)):
                         first_image_id_str = None # Fallback if unexpected type
                     if first_image_id_str:
                         listing_id_str = str(product_listing["_id"])
-                        api_base_url = os.getenv('NEXT_PUBLIC_API_BASE_URL')
-                        if not api_base_url:
-                            print("DEBUG_ORDERS: WARNING: NEXT_PUBLIC_API_BASE_URL environment variable is not set. Using placeholder for image URL.")
-                            product_image_url = "/placeholder.svg"
-                        else:
-                            product_image_url = f"{api_base_url}/api/listings/{listing_id_str}/images/{first_image_id_str}"
-                            print(f"DEBUG_ORDERS: Constructed image URL: {product_image_url}")
+                        product_image_url = get_first_image_url(listing_id_str, [first_image_id_str])
+                        print(f"DEBUG_ORDERS: Constructed image URL: {product_image_url}")
                     else:
                         print("DEBUG_ORDERS: No valid image ID extracted from product_listing['image_ids'][0]. Using placeholder.")
                 else:
