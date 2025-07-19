@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -54,10 +54,30 @@ type ArtistData = {
   state?: string;
 };
 
+// Custom hook for debounced value
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function Marketplace() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // Debounce search query to avoid API calls on every keystroke
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   
   // Separate filter states for UI and applied filters
   const [tempPriceRange, setTempPriceRange] = useState([0, 20000]);
@@ -80,7 +100,7 @@ export default function Marketplace() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-   useEffect(() => {
+  useEffect(() => {
     if (searchParams?.get("success") === "true") {
       router.replace("/marketplace/success");
     }
@@ -89,109 +109,120 @@ export default function Marketplace() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
+  }, [debouncedSearchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
 
   // Fetch listings when page or applied filters change
-  useEffect(() => {
-    async function fetchListings() {
-      setIsLoading(true);
-      try {
-        const skip = (currentPage - 1) * itemsPerPage;
-        const searchParams = new URLSearchParams({
-          skip: skip.toString(),
-          limit: itemsPerPage.toString(),
-          search: searchQuery,
-          min_price: appliedPriceRange[0].toString(),
-          max_price: appliedPriceRange[1].toString(),
-          category: appliedSelectedCraft,
-          state: appliedSelectedState
-        });
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${searchParams}`);
-        
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        
-        const data = await res.json();
-        
-        // Check if data has the expected structure
-        if (!data.listings || !Array.isArray(data.listings)) {
-          throw new Error('Invalid response structure from API');
-        }
-        
-        const products = await Promise.all(
-          (data.listings as ListingFromApi[]).map(async (item: ListingFromApi) => {
-            let artistData: ArtistData = {};
-            try {
-              const artistId = item.artist_id ?? "";
-              console.log("Fetching artist data for ID:", artistId);
-              const artistRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/public/${artistId}`);
-              if (artistRes.ok) artistData = await artistRes.json();
-            } catch {
-              artistData = { name: "Traditional Artisan", region: "Unknown", state: "India" };
-            }
-
-            const suggestedPriceStr = (item.suggested_price ?? "299").toString();
-            const parsedPrice = parseInt(suggestedPriceStr.replace(/\D/g, "")) || 299;
-
-            return {
-              id: item._id,
-              title: item.title || "Untitled Product",
-              description: item.description || "No description available",
-              price: parsedPrice,
-              originalPrice: Math.round(parsedPrice * 1.2),
-              image: item.image_ids?.[0]
-                ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${item._id}/images/${item.image_ids[0]}`
-                : "/placeholder.svg",
-              artisan: {
-                name: artistData.name || artistData.display_name || "Unknown",
-                location: `${artistData.region ?? "Unknown"}, ${artistData.state ?? "India"}`,
-                rating: 4.8,
-                craft: item.category ?? "Art",
-                verified: true,
-              },
-              category: item.category ?? "Art",
-              tags: item.tags || [],
-              inStock: item.status === "active",
-              featured: Math.random() > 0.7,
-              trending: Math.random() > 0.8,
-              reviews: Math.floor(Math.random() * 50) + 10,
-              soldCount: Math.floor(Math.random() * 100) + 20,
-            };
-          })
-        );
-        setProducts(products);
-        setFilteredProducts(products);
-        setTotalCount(data.total || 0);
-        setError(null); // Clear any previous errors
-      } catch (err) {
-        console.error('Error fetching listings:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch listings');
-        setProducts([]);
-        setFilteredProducts([]);
-        setTotalCount(0);
-      } finally {
-        setIsLoading(false);
+  const fetchListings = useCallback(async () => {
+    setIsLoading(true);
+    setIsSearching(true);
+    try {
+      const skip = (currentPage - 1) * itemsPerPage;
+      const searchParams = new URLSearchParams({
+        skip: skip.toString(),
+        limit: itemsPerPage.toString(),
+        search: debouncedSearchQuery,
+        min_price: appliedPriceRange[0].toString(),
+        max_price: appliedPriceRange[1].toString(),
+        category: appliedSelectedCraft,
+        state: appliedSelectedState
+      });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${searchParams}`);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
       }
+      
+      const data = await res.json();
+      
+      // Check if data has the expected structure
+      if (!data.listings || !Array.isArray(data.listings)) {
+        throw new Error('Invalid response structure from API');
+      }
+      
+      const products = await Promise.all(
+        (data.listings as ListingFromApi[]).map(async (item: ListingFromApi) => {
+          let artistData: ArtistData = {};
+          try {
+            const artistId = item.artist_id ?? "";
+            console.log("Fetching artist data for ID:", artistId);
+            const artistRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/public/${artistId}`);
+            if (artistRes.ok) artistData = await artistRes.json();
+          } catch {
+            artistData = { name: "Traditional Artisan", region: "Unknown", state: "India" };
+          }
+
+          const suggestedPriceStr = (item.suggested_price ?? "299").toString();
+          const parsedPrice = parseInt(suggestedPriceStr.replace(/\D/g, "")) || 299;
+
+          return {
+            id: item._id,
+            title: item.title || "Untitled Product",
+            description: item.description || "No description available",
+            price: parsedPrice,
+            originalPrice: Math.round(parsedPrice * 1.2),
+            image: item.image_ids?.[0]
+              ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${item._id}/images/${item.image_ids[0]}`
+              : "/placeholder.svg",
+            artisan: {
+              name: artistData.name || artistData.display_name || "Unknown",
+              location: `${artistData.region ?? "Unknown"}, ${artistData.state ?? "India"}`,
+              rating: 4.8,
+              craft: item.category ?? "Art",
+              verified: true,
+            },
+            category: item.category ?? "Art",
+            tags: item.tags || [],
+            inStock: item.status === "active",
+            featured: Math.random() > 0.7,
+            trending: Math.random() > 0.8,
+            reviews: Math.floor(Math.random() * 50) + 10,
+            soldCount: Math.floor(Math.random() * 100) + 20,
+          };
+        })
+      );
+      setAllProducts(products);
+      setTotalCount(data.total || 0);
+      setError(null); // Clear any previous errors
+    } catch (err) {
+      console.error('Error fetching listings:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch listings');
+      setAllProducts([]);
+      setTotalCount(0);
+    } finally {
+      setIsLoading(false);
+      setIsSearching(false);
     }
+  }, [currentPage, debouncedSearchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
+
+  useEffect(() => {
     fetchListings();
-  }, [currentPage, searchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
+  }, [fetchListings]);
 
-  const crafts = [...new Set(products.map((p) => p.category.toLowerCase()))];
-  const states = [...new Set(products.map((p) => p.artisan.location.split(",")[1]?.trim().toLowerCase()))];
+  // Memoize filtered products to avoid recalculation on every render
+  const filteredProducts = useMemo(() => {
+    return allProducts;
+  }, [allProducts]);
 
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const crafts = useMemo(() => {
+    return [...new Set(allProducts.map((p) => p.category.toLowerCase()))];
+  }, [allProducts]);
+
+  const states = useMemo(() => {
+    return [...new Set(allProducts.map((p) => p.artisan.location.split(",")[1]?.trim().toLowerCase()))];
+  }, [allProducts]);
+
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const target = e.target as HTMLImageElement;
     target.src = "/placeholder.svg";
-  };
+  }, []);
 
-  const handleApplyFilters = () => {
+  const handleApplyFilters = useCallback(() => {
     setAppliedPriceRange(tempPriceRange);
     setAppliedSelectedCraft(tempSelectedCraft);
     setAppliedSelectedState(tempSelectedState);
-  };
+  }, [tempPriceRange, tempSelectedCraft, tempSelectedState]);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setTempPriceRange([0, 20000]);
     setTempSelectedCraft("all");
     setTempSelectedState("all");
@@ -199,7 +230,11 @@ export default function Marketplace() {
     setAppliedSelectedCraft("all");
     setAppliedSelectedState("all");
     setSearchQuery("");
-  };
+  }, []);
+
+  const handleQuickSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
@@ -253,6 +288,11 @@ export default function Marketplace() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-16 pr-20 py-6 text-lg border-2 border-orange-200 focus:border-orange-400 rounded-2xl bg-white/80 backdrop-blur-sm shadow-lg"
                     />
+                    {isSearching && (
+                      <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-orange-500"></div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -261,7 +301,7 @@ export default function Marketplace() {
                   <Badge
                     variant="outline"
                     className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
-                    onClick={() => setSearchQuery("")}
+                    onClick={() => handleQuickSearch("")}
                   >
                     <Sparkles className="w-4 h-4 mr-2" />
                     All
@@ -269,7 +309,7 @@ export default function Marketplace() {
                   <Badge
                     variant="outline"
                     className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
-                    onClick={() => setSearchQuery("madhubani")}
+                    onClick={() => handleQuickSearch("madhubani")}
                   >
                     <TrendingUp className="w-4 h-4 mr-2" />
                     Madhubani
@@ -277,14 +317,14 @@ export default function Marketplace() {
                   <Badge
                     variant="outline"
                     className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
-                    onClick={() => setSearchQuery("art")}
+                    onClick={() => handleQuickSearch("art")}
                   >
                     Art
                   </Badge>
                   <Badge
                     variant="outline"
                     className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
-                    onClick={() => setSearchQuery("traditional")}
+                    onClick={() => handleQuickSearch("traditional")}
                   >
                     Traditional
                   </Badge>
@@ -385,9 +425,12 @@ export default function Marketplace() {
                 <div className="flex items-center justify-between mb-8 bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-orange-200 shadow-sm">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-800">
-                      {searchQuery ? `Results for "${searchQuery}"` : "All Products"}
+                      {debouncedSearchQuery ? `Results for "${debouncedSearchQuery}"` : "All Products"}
                     </h2>
-                    <p className="text-gray-600 mt-1">{filteredProducts.length} handcrafted treasures found</p>
+                    <p className="text-gray-600 mt-1">
+                      {filteredProducts.length} handcrafted treasures found
+                      {isSearching && " (searching...)"}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <Button
@@ -441,135 +484,146 @@ export default function Marketplace() {
                 </div>
 
                 {/* Products Grid */}
-                {filteredProducts.length === 0 ? (
-                  <Card className="border-2 border-orange-200 bg-white/80 backdrop-blur-sm">
-                    <CardContent className="p-16 text-center">
-                      <Search className="w-20 h-20 text-gray-400 mx-auto mb-6" />
-                      <h3 className="text-2xl font-semibold text-gray-600 mb-3">No products found</h3>
-                      <p className="text-gray-500 text-lg">
-                        Try adjusting your search or filters to discover more treasures
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div
-                    className={`grid gap-6 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"
-                      }`}
-                  >
-                    {filteredProducts.map((product) => (
-                      <Card
-                        key={product.id}
-                        id={`product-${product.id}`}
-                        className="group border-2 border-orange-200 hover:border-orange-300 transition-all duration-300 hover:shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden"
-                      >
-                        <div className={`${viewMode === "grid" ? "" : "flex"}`}>
-                          <div
-                            className={`relative overflow-hidden ${viewMode === "grid" ? "aspect-[4/3]" : "w-48 h-48 flex-shrink-0"
-                              }`}
-                          >
-                            <img
-                              src={product.image}
-                              alt={product.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              onError={handleImageError}
-                            />
-                            {/* Overlay Badges */}
-                            <div className="absolute top-2 left-2 flex flex-col gap-1">
-                              {product.featured && (
-                                <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg text-xs">
-                                  <Sparkles className="w-3 h-3 mr-1" />
-                                  Featured
-                                </Badge>
-                              )}
-                              {product.trending && (
-                                <Badge className="bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg text-xs">
-                                  <TrendingUp className="w-3 h-3 mr-1" />
-                                  Trending
-                                </Badge>
-                              )}
-                            </div>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 hover:bg-white shadow-lg rounded-full p-1.5"
+                <div className="relative">
+                  {isSearching && (
+                    <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                      <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-lg">
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-orange-500"></div>
+                        <span className="text-gray-700">Searching...</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {filteredProducts.length === 0 && !isSearching ? (
+                    <Card className="border-2 border-orange-200 bg-white/80 backdrop-blur-sm">
+                      <CardContent className="p-16 text-center">
+                        <Search className="w-20 h-20 text-gray-400 mx-auto mb-6" />
+                        <h3 className="text-2xl font-semibold text-gray-600 mb-3">No products found</h3>
+                        <p className="text-gray-500 text-lg">
+                          Try adjusting your search or filters to discover more treasures
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div
+                      className={`grid gap-6 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"
+                        }`}
+                    >
+                      {filteredProducts.map((product) => (
+                        <Card
+                          key={product.id}
+                          id={`product-${product.id}`}
+                          className="group border-2 border-orange-200 hover:border-orange-300 transition-all duration-300 hover:shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden"
+                        >
+                          <div className={`${viewMode === "grid" ? "" : "flex"}`}>
+                            <div
+                              className={`relative overflow-hidden ${viewMode === "grid" ? "aspect-[4/3]" : "w-48 h-48 flex-shrink-0"
+                                }`}
                             >
-                              <Heart className="w-4 h-4 text-gray-600 hover:text-red-500" />
-                            </Button>
-
-                            {/* Discount Badge */}
-                            {product.originalPrice > product.price && (
-                              <Badge className="absolute bottom-2 right-2 bg-red-500 text-white shadow-lg text-xs">
-                                {Math.round((1 - product.price / product.originalPrice) * 100)}% OFF
-                              </Badge>
-                            )}
-                          </div>
-
-                          <CardContent className={`${viewMode === "grid" ? "p-4" : "p-6 flex-1"}`}>
-                            <div className="space-y-3">
-                              <div>
-                                <h3 className="font-semibold text-gray-800 text-base line-clamp-2 group-hover:text-orange-600 transition-colors mb-1">
-                                  {product.title}
-                                </h3>
-                                <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed">
-                                  {product.description}
-                                </p>
+                              <img
+                                src={product.image}
+                                alt={product.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={handleImageError}
+                              />
+                              {/* Overlay Badges */}
+                              <div className="absolute top-2 left-2 flex flex-col gap-1">
+                                {product.featured && (
+                                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg text-xs">
+                                    <Sparkles className="w-3 h-3 mr-1" />
+                                    Featured
+                                  </Badge>
+                                )}
+                                {product.trending && (
+                                  <Badge className="bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg text-xs">
+                                    <TrendingUp className="w-3 h-3 mr-1" />
+                                    Trending
+                                  </Badge>
+                                )}
                               </div>
 
-                              {/* Artisan Info */}
-                              <div className="flex items-center gap-2 text-xs">
-                                <div className="flex items-center gap-1 text-gray-600">
-                                  <MapPin className="w-3 h-3" />
-                                  <span className="font-medium truncate">{product.artisan.name}</span>
-                                  {product.artisan.verified && (
-                                    <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                                      <span className="text-white text-xs">✓</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 hover:bg-white shadow-lg rounded-full p-1.5"
+                              >
+                                <Heart className="w-4 h-4 text-gray-600 hover:text-red-500" />
+                              </Button>
 
-                              {/* Rating & Reviews */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1">
-                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                  <span className="text-xs font-semibold">{product.artisan.rating}</span>
-                                  <span className="text-xs text-gray-500">({product.reviews})</span>
-                                </div>
-                                <Badge variant="outline" className="border-orange-200 text-orange-700 text-xs">
-                                  {product.category}
+                              {/* Discount Badge */}
+                              {product.originalPrice > product.price && (
+                                <Badge className="absolute bottom-2 right-2 bg-red-500 text-white shadow-lg text-xs">
+                                  {Math.round((1 - product.price / product.originalPrice) * 100)}% OFF
                                 </Badge>
-                              </div>
-
-                              {/* Price and Buy Now Button */}
-                              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg font-bold text-orange-600">₹{product.price}</span>
-                                  {product.originalPrice > product.price && (
-                                    <span className="text-xs text-gray-500 line-through">₹{product.originalPrice}</span>
-                                  )}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-3 py-1.5 text-xs font-semibold shadow"
-                                  onClick={() => {
-                                    if (!profile) {
-                                      window.location.href = "/buyer/login";
-                                      return;
-                                    }
-                                    window.location.href = `/product/${product.id}`;
-                                  }}
-                                >
-                                  Buy Now
-                                </Button>
-                              </div>
+                              )}
                             </div>
-                          </CardContent>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+
+                            <CardContent className={`${viewMode === "grid" ? "p-4" : "p-6 flex-1"}`}>
+                              <div className="space-y-3">
+                                <div>
+                                  <h3 className="font-semibold text-gray-800 text-base line-clamp-2 group-hover:text-orange-600 transition-colors mb-1">
+                                    {product.title}
+                                  </h3>
+                                  <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed">
+                                    {product.description}
+                                  </p>
+                                </div>
+
+                                {/* Artisan Info */}
+                                <div className="flex items-center gap-2 text-xs">
+                                  <div className="flex items-center gap-1 text-gray-600">
+                                    <MapPin className="w-3 h-3" />
+                                    <span className="font-medium truncate">{product.artisan.name}</span>
+                                    {product.artisan.verified && (
+                                      <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                                        <span className="text-white text-xs">✓</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Rating & Reviews */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1">
+                                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                    <span className="text-xs font-semibold">{product.artisan.rating}</span>
+                                    <span className="text-xs text-gray-500">({product.reviews})</span>
+                                  </div>
+                                  <Badge variant="outline" className="border-orange-200 text-orange-700 text-xs">
+                                    {product.category}
+                                  </Badge>
+                                </div>
+
+                                {/* Price and Buy Now Button */}
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg font-bold text-orange-600">₹{product.price}</span>
+                                    {product.originalPrice > product.price && (
+                                      <span className="text-xs text-gray-500 line-through">₹{product.originalPrice}</span>
+                                    )}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-3 py-1.5 text-xs font-semibold shadow"
+                                    onClick={() => {
+                                      if (!profile) {
+                                        window.location.href = "/buyer/login";
+                                        return;
+                                      }
+                                      window.location.href = `/product/${product.id}`;
+                                    }}
+                                  >
+                                    Buy Now
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </>
