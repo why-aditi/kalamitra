@@ -81,7 +81,7 @@ export default function ArtisanProducts() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {listings.map((listing, index) => {
               const imageUrl = listing.images?.[0] || "/placeholder.svg" // Use the 'images' array directly
 

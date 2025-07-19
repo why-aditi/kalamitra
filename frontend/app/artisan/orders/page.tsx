@@ -147,12 +147,12 @@ export default function ArtisanOrdersPage() {
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
       <div className="container mx-auto px-4 py-8">
         {/* Page Header */}
-        <div className="mb-8">
+        <div className="mb-8 mx-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">My Orders</h1>
           <p className="text-gray-600">Manage orders of your products</p>
         </div>
         {/* Search */}
-        <div className="mb-6">
+        <div className="mb-6 mx-8">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
@@ -164,7 +164,7 @@ export default function ArtisanOrdersPage() {
           </div>
         </div>
         {/* Orders Tabs */}
-        <Tabs defaultValue="all" className="space-y-6">
+        <Tabs defaultValue="all" className="space-y-6 mx-8">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="all">All Orders ({filteredOrders.length})</TabsTrigger>
             <TabsTrigger value="pending">Pending ({getOrdersByStatus("pending").length})</TabsTrigger>
@@ -192,7 +192,7 @@ export default function ArtisanOrdersPage() {
             ) : (
               <div className="space-y-4">
                 {filteredOrders.map((order) => (
-                  <Card key={order.id} className="border-orange-200 hover:shadow-lg transition-shadow">
+                  <Card key={order.id} className="border-orange-200 hover:shadow-lg transition-shadow mx-6">
                     <CardContent className="p-6">
                       <div className="flex items-start gap-4">
                         {/* Product Image */}

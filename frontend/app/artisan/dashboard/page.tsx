@@ -167,7 +167,7 @@ export default function ArtisanDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+    <div className="bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
       {showSuccess && (
         <div className="bg-green-500 text-white px-4 py-3 text-center">
           <div className="flex items-center justify-center gap-2">
@@ -176,7 +176,7 @@ export default function ArtisanDashboard() {
           </div>
         </div>
       )}
-      <div className="container mx-auto px-4 py-8 mb-8">
+      <div className="container mx-auto px-4 py-8">
         <div className="mx-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {artisanProfile.name}! 👋</h1>
           <p className="text-gray-600">
@@ -252,7 +252,7 @@ export default function ArtisanDashboard() {
                 </Button>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {listings.map((listing, index) => (
                   <Card key={listing.id || `listing-${index}`} className="hover:shadow-lg">
                     <div className="aspect-square relative overflow-hidden rounded-t-lg">
