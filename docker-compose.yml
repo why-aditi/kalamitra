@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   frontend:
@@ -20,6 +20,9 @@ services:
       - "8000:8000"
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/kalamitra
+      - DATABASE_NAME=kalamitra
+    command: >
+      sh -c "python scripts/seed_orders.py && uvicorn main:app --host 0.0.0.0 --port 8000"
     depends_on:
       - mongodb
 
