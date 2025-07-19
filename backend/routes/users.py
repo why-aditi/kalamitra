@@ -29,7 +29,8 @@ async def get_current_user_profile(current_user: dict = Depends(get_current_user
             phone_number=user.get("phone_number"),
             role=user.get("role"),
             address=user.get("address"),
-            is_onboarded=user.get("is_onboarded")
+            is_onboarded=user.get("is_onboarded"),
+            created_at=user.get("created_at")
         )
     except KeyError:
         raise HTTPException(
@@ -47,7 +48,7 @@ async def update_user_profile(
     """
     firebase_uid = current_user["firebase_uid"]
     mongo_update = {"updated_at": datetime.utcnow()}
-
+    
     if profile_update.display_name is not None:
         mongo_update["display_name"] = profile_update.display_name
     if profile_update.phone_number is not None:
@@ -69,7 +70,6 @@ async def update_user_profile(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found after update"
             )
-
         # Directly construct UserProfile from the fetched document
         return UserProfile(
             display_name=updated_user_doc.get("display_name"),
@@ -79,6 +79,7 @@ async def update_user_profile(
             address=updated_user_doc.get("address"),
             is_onboarded=updated_user_doc.get("is_onboarded")
         )
+
     except Exception as e:
         print(f"Error updating profile for {firebase_uid}: {e}")
         raise HTTPException(status_code=500, detail="Failed to update user profile.")
