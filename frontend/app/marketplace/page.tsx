@@ -11,6 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { Search, Heart, MapPin, Star, Mic, Grid, List, Filter, Palette, Sparkles, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useAuthContext } from "@/components/providers/auth-provider";
+import { processVoiceTranscription } from "@/lib/voice-utils";
 
 type Product = {
   id: string;
@@ -93,6 +94,7 @@ export default function Marketplace() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isVoiceSearch, setIsVoiceSearch] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const itemsPerPage = 12;
@@ -259,10 +261,18 @@ export default function Marketplace() {
     // The search will be triggered by the useEffect watching debouncedSearchQuery
   }, []);
 
+  const handleVoiceSearch = useCallback(async (searchData: { transcript: string, keywords: string[] }) => {
+    const { language, english, keywords } = await processVoiceTranscription(searchData.transcript);
+    if (language !== 'en') {
+      setSearchQuery(english);
+    } else {
+      setSearchQuery(searchData.transcript);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
       <div className="container mx-auto px-4 py-8">
-        {/* Initial Loading State (only show on first load) */}
         {isLoading && allProducts.length === 0 && (
           <div className="text-center py-16">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mb-4"></div>
@@ -312,7 +322,64 @@ export default function Marketplace() {
                       onChange={handleSearchInput}
                       className="pl-16 pr-20 py-6 text-lg border-2 border-orange-200 focus:border-orange-400 rounded-2xl bg-white/80 backdrop-blur-sm shadow-lg"
                     />
-                    {isSearching && (
+                    <div className="absolute right-16 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className={`p-2 hover:bg-orange-100 rounded-full transition-all duration-200 ${
+                          isVoiceSearch ? 'scale-125 bg-orange-100 shadow-lg' : 'scale-100'
+                        }`}
+                        onClick={async () => {
+                          if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                            alert('Speech recognition not supported in this browser.');
+                            return;
+                          }
+                          const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                          const recognition = new SpeechRecognition();
+                          recognition.lang = 'en-US';
+                          recognition.interimResults = false;
+                          recognition.maxAlternatives = 1;
+                          setIsVoiceSearch(true);
+                          setVoiceStatus('Listening...');
+                          recognition.onresult = async (event: any) => {
+                            const transcript = event.results[0][0].transcript;
+                            setVoiceStatus('Processing...');
+                            try {
+                              const { english } = await processVoiceTranscription(transcript);
+                              setSearchQuery(english);
+                              setVoiceStatus('');
+                            } catch (error) {
+                              console.error('Translation error:', error);
+                              setSearchQuery(transcript); // Fallback to original transcript
+                              setVoiceStatus('');
+                            }
+                            setIsVoiceSearch(false);
+                          };
+                          recognition.onerror = () => {
+                            setIsVoiceSearch(false);
+                            setVoiceStatus('');
+                            alert('Voice recognition failed. Please try again.');
+                          };
+                          recognition.onend = () => {
+                            if (voiceStatus === 'Listening...') {
+                              setIsVoiceSearch(false);
+                              setVoiceStatus('');
+                            }
+                          };
+                          recognition.start();
+                        }}
+                        disabled={isVoiceSearch}
+                        aria-label="Voice Search"
+                      >
+                        <Mic className={`w-5 h-5 ${
+                          isVoiceSearch ? 'animate-pulse text-orange-600' : 'text-black hover:text-orange-600'
+                        }`} />
+                      </Button>
+                      {voiceStatus && (
+                        <span className="text-sm text-orange-600 font-medium">{voiceStatus}</span>
+                      )}
+                    </div>
+                    {(isSearching || isVoiceSearch) && (
                       <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
                         <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-orange-500"></div>
                       </div>
