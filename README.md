@@ -2,6 +2,8 @@
 
 Kalamitra is a full-stack marketplace platform connecting artisans with buyers, built with Next.js 14 and FastAPI.
 
+Hosted Link: https://kalamitra-seven.vercel.app/
+
 ## Project Overview
 
 The project consists of two main components:
