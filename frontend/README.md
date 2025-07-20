@@ -191,6 +191,50 @@ NEXT_PUBLIC_CLOUDINARY_API_SECRET=
 
 3. Deploy to your hosting platform of choice
 
+## Open Source Libraries
+
+Kalamitra's frontend leverages a variety of open-source libraries and frameworks. Here's the detailed information:
+
+### Libraries and Dependencies
+
+#### Core Framework
+- **Next.js** `15.2.4` | MIT License | Direct integration
+  - Source: [Next.js GitHub](https://github.com/vercel/next.js)
+- **React** `^18.3.1` | MIT License | Direct integration
+  - Source: [React GitHub](https://github.com/facebook/react)
+
+#### UI Components
+- **Tailwind CSS** `^3.4.17` | MIT License | Direct integration
+  - Source: [Tailwind CSS GitHub](https://github.com/tailwindlabs/tailwindcss)
+- **Radix UI** | MIT License | Direct integration
+  - Source: [Radix UI GitHub](https://github.com/radix-ui/primitives)
+
+#### Form Handling
+- **React Hook Form** `^7.54.1` | MIT License | Direct integration
+  - Source: [React Hook Form GitHub](https://github.com/react-hook-form/react-hook-form)
+- **Zod** `^3.24.1` | MIT License | Direct integration
+  - Source: [Zod GitHub](https://github.com/colinhacks/zod)
+
+#### AI Services
+- **Google Generative AI** `^0.24.1` | Apache 2.0 License | Direct integration
+  - Source: [Google Generative AI GitHub](https://github.com/google/generative-ai-js)
+- **Firebase** `^11.10.0` | Apache 2.0 License | Direct integration
+  - Source: [Firebase GitHub](https://github.com/firebase/firebase-js-sdk)
+
+#### Utilities
+- **clsx** `^2.1.1` | MIT License | Direct integration
+  - Source: [clsx GitHub](https://github.com/lukeed/clsx)
+- **Autoprefixer** `^10.4.20` | MIT License | Direct integration
+  - Source: [Autoprefixer GitHub](https://github.com/postcss/autoprefixer)
+
+### License Summary
+
+The frontend primarily uses MIT and Apache 2.0 licensed libraries.
+
+### Attribution Notice
+
+The frontend of Kalamitra has been built upon the hard work of the open-source community. We thank everyone involved with these projects.
+
 ## Contributing
 
 1. Fork the repository

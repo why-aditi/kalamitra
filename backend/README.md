@@ -216,6 +216,54 @@ Interactive API documentation is available at:
    gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
    ```
 
+## Open Source Libraries
+
+Kalamitra's backend uses the following open-source libraries and frameworks:
+
+### Libraries and Dependencies
+
+#### Core Framework
+- **FastAPI** `0.109.1` | MIT License | Direct integration
+  - Source: [FastAPI GitHub](https://github.com/tiangolo/fastapi)
+- **Uvicorn** `0.27.0` | BSD License | Direct integration
+  - Source: [Uvicorn GitHub](https://github.com/encode/uvicorn)
+
+#### Database
+- **Motor** `3.7.1` | Apache License 2.0 | Direct integration
+  - Source: [Motor GitHub](https://github.com/mongodb/motor)
+- **PyMongo** `4.9.0` | Apache License 2.0 | Direct integration
+  - Source: [PyMongo GitHub](https://github.com/mongodb/mongo-python-driver)
+
+#### AI Services
+- **Google Generative AI** `0.8.5` | Apache License 2.0 | Direct integration
+  - Source: [Google Generative AI Python GitHub](https://github.com/google-ai-edge/generative-ai-python)
+- **Firebase Admin** `6.4.0` | Apache License 2.0 | Direct integration
+  - Source: [Firebase Admin SDK Python GitHub](https://github.com/firebase/firebase-admin-python)
+
+#### Authentication
+- **PyJWT** `2.10.1` | MIT License | Direct integration
+  - Source: [PyJWT GitHub](https://github.com/jpadilla/pyjwt)
+
+#### Image Processing
+- **Pillow** `11.3.0` | PIL Software License | Direct integration
+  - Source: [Pillow GitHub](https://github.com/python-pillow/Pillow)
+
+#### HTTP
+- **HTTPx** `0.28.1` | BSD License | Direct integration
+  - Source: [HTTPx GitHub](https://github.com/encode/httpx)
+
+#### Utilities
+- **python-dotenv** `1.0.0` | BSD License | Direct integration
+  - Source: [python-dotenv GitHub](https://github.com/theskumar/python-dotenv)
+
+### License Summary
+
+The backend primarily uses MIT, Apache 2.0, and BSD licensed libraries.
+
+### Attribution Notice
+
+The backend of Kalamitra relies on these open-source projects and we appreciate the contributions of these communities.
+
 ## Contributing
 
 1. Fork the repository
