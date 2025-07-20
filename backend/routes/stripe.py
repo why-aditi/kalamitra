@@ -8,10 +8,12 @@ from bson import ObjectId
 from datetime import datetime, timedelta
 from services.database import Database # Import your Database service
 from .auth import get_current_user # Import get_current_user
+from dotenv import load_dotenv
+import os
+     
+load_dotenv()  # Load environment variables from .env file
 
-# Load environment variables (ensure this is done once at app startup, e.g., in main.py)
-# load_dotenv() # Removed from here, assumed to be in main.py
-
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "localhost:3000")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 router = APIRouter()
@@ -114,8 +116,8 @@ async def create_checkout_session(
                 "quantity": product.get("quantity", 1),
             }],
             mode="payment",
-            success_url=f"http://localhost:3000/marketplace/success?order_id={result.inserted_id}",
-            cancel_url=f"http://localhost:3000/marketplace/cancel?order_id={result.inserted_id}",
+            success_url=f"http://{ALLOWED_ORIGINS}/marketplace/success?order_id={result.inserted_id}",
+            cancel_url=f"http://{ALLOWED_ORIGINS}/marketplace/cancel?order_id={result.inserted_id}",
             metadata={
                 "order_id": str(result.inserted_id),
                 "buyerEmail": buyer["email"],  
