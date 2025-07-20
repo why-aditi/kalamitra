@@ -13,7 +13,7 @@ import os
      
 load_dotenv()  # Load environment variables from .env file
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "localhost:3000")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS")
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 router = APIRouter()
