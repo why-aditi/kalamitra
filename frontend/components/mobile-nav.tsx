@@ -7,6 +7,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import { useAuthContext } from '@/components/providers/auth-provider';
+import { DialogTitle } from '@radix-ui/react-dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 export function MobileNav() {
   const [open, setOpen] = React.useState(false);
@@ -15,10 +17,8 @@ export function MobileNav() {
   const { user, profile, signOut } = useAuthContext();
 
   const getNavLinks = () => {
-    if (!profile) return [
-      { href: '/marketplace', label: 'Marketplace' }
-    ];
-    
+    if (!profile) return [{ href: '/marketplace', label: 'Marketplace' }];
+
     switch (profile.role) {
       case 'artisan':
         return [
@@ -44,9 +44,7 @@ export function MobileNav() {
           { href: '/admin/profile', label: 'Profile' }
         ];
       default:
-        return [
-          { href: '/marketplace', label: 'Marketplace' }
-        ];
+        return [{ href: '/marketplace', label: 'Marketplace' }];
     }
   };
 
@@ -73,12 +71,21 @@ export function MobileNav() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="pr-0">
-        <nav className="flex flex-col space-y-4">
+        {/* Accessibility fix */}
+        <DialogTitle asChild>
+          <VisuallyHidden>Navigation Menu</VisuallyHidden>
+        </DialogTitle>
+
+        <nav className="flex flex-col space-y-4 mt-2">
           {routes.map((route) => (
             <Link
               key={route.href}
               href={route.href}
-              className={`text-sm font-medium transition-colors hover:text-primary ${pathname.startsWith(route.href) ? 'text-black dark:text-white' : 'text-muted-foreground'}`}
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                pathname.startsWith(route.href)
+                  ? 'text-black dark:text-white'
+                  : 'text-muted-foreground'
+              }`}
               onClick={() => setOpen(false)}
             >
               {route.label}
