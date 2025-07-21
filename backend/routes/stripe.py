@@ -116,8 +116,8 @@ async def create_checkout_session(
                 "quantity": product.get("quantity", 1),
             }],
             mode="payment",
-            success_url=f"{ALLOWED_ORIGINS}/marketplace/success?order_id={result.inserted_id}",
-            cancel_url=f"{ALLOWED_ORIGINS}/marketplace/cancel?order_id={result.inserted_id}",
+            success_url=f"https://kalamitra-seven.vercel.app/marketplace/success?order_id={result.inserted_id}",
+            cancel_url=f"https://kalamitra-seven.vercel.app/marketplace/cancel?order_id={result.inserted_id}",
             metadata={
                 "order_id": str(result.inserted_id),
                 "buyerEmail": buyer["email"],  
