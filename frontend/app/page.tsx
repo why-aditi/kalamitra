@@ -108,13 +108,11 @@ export default function LandingPage() {
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
-                        <iframe
-                          src="https://www.loom.com/share/6d39f273fd8441a1a516c4336a232f68?sid=beb81298-986d-4bfe-9315-ed26e0cce632"
-                          frameBorder="0"
+                        <iframe 
+                        src="https://www.loom.com/embed/6d39f273fd8441a1a516c4336a232f68?sid=aafb18b2-a49d-479b-8b3d-1fdef44ee612" frameBorder="0"
                           allowFullScreen
                           className="w-full h-full rounded-2xl"
-                          style={{ aspectRatio: '16/9', minHeight: '100%', minWidth: '100%' }}
-                        />
+                          style={{ aspectRatio: '16/9', minHeight: '100%', minWidth: '100%' }}/>
 
                       </div>
                     </div>
