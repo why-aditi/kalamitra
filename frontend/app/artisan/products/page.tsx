@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Plus, Package, Eye, Edit } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge" // Ensure Badge is imported
+import { ProductImage } from "@/components/product-image"
 
 interface Listing {
   id: string // Changed from _id to id to match Pydantic model alias
@@ -48,13 +49,13 @@ export default function ArtisanProducts() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 py-10">
+    <div className="min-h-screen py-10">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">My Products</h1>
+          <h1 className="text-3xl font-bold text-foreground">My Products</h1>
           <Button
             asChild
-            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+            className="bg-madder"
           >
             <Link href="/artisan/create-listing">
               <Plus className="w-4 h-4 mr-2" /> Add New Product
@@ -63,16 +64,16 @@ export default function ArtisanProducts() {
         </div>
 
         {loading ? (
-          <div className="text-center text-gray-500 py-20">Loading...</div>
+          <div className="text-center text-muted-foreground py-20">Loading...</div>
         ) : listings.length === 0 ? (
-          <Card className="border-orange-200">
+          <Card className="border-border">
             <CardContent className="p-12 text-center">
-              <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">No products yet</h3>
-              <p className="text-gray-500 mb-6">Create your first product listing to start selling</p>
+              <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-muted-foreground mb-2">No products yet</h3>
+              <p className="text-muted-foreground mb-6">Create your first product listing to start selling</p>
               <Button
                 asChild
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                className="bg-madder"
               >
                 <Link href="/artisan/create-listing">
                   <Plus className="w-4 h-4 mr-2" /> Create Your First Listing
@@ -88,18 +89,14 @@ export default function ArtisanProducts() {
               return (
                 <Card key={listing.id || `listing-${index}`} className="hover:shadow-lg">
                   <div className="aspect-square relative overflow-hidden rounded-t-lg">
-                    <img
-                      src={imageUrl || "/placeholder.svg"}
-                      alt={listing.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <Badge className="absolute top-2 right-2 bg-green-500">Published</Badge>
+                    <ProductImage src={imageUrl || "/placeholder.svg"} alt={listing.title} sizes="(min-width: 768px) 20rem, 92vw" />
+                    <Badge className="absolute top-2 right-2 bg-neem">Published</Badge>
                   </div>
                   <CardContent className="p-4">
-                    <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{listing.title}</h3>
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{listing.description}</p>
+                    <h3 className="font-semibold text-foreground mb-2 line-clamp-2">{listing.title}</h3>
+                    <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{listing.description}</p>
                     <div className="flex justify-between mb-4">
-                      <span className="text-lg font-bold text-orange-600">{listing.suggestedPrice}</span>
+                      <span className="text-lg font-bold text-madder">{listing.suggestedPrice}</span>
                       <Badge variant="outline">{listing.category}</Badge> {/* Using Badge for consistency */}
                     </div>
                     <div className="flex gap-2">

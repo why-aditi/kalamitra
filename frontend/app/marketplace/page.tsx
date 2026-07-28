@@ -1,104 +1,111 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Search, Heart, MapPin, Star, Mic, Grid, List, Filter, Palette, Sparkles, TrendingUp } from "lucide-react";
-import Link from "next/link";
-import { useAuthContext } from "@/components/providers/auth-provider";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ProductImage } from "@/components/product-image";
+import { Search, MapPin, Mic, SlidersHorizontal, Star } from "lucide-react";
+import { API_BASE_URL, buildQuery, isAbortError } from "@/lib/api-client";
 import { processVoiceTranscription } from "@/lib/voice-utils";
+
+const PAGE_SIZE = 12;
+const MAX_PRICE = 20000;
 
 type Product = {
   id: string;
   title: string;
   description: string;
   price: number;
-  originalPrice: number;
-  image: string;
-  artisan: {
-    name: string;
-    location: string;
-    rating: number;
-    craft: string;
-    verified: boolean;
-  };
-  category: string;
-  tags: string[];
+  image?: string;
+  artisanName: string;
+  region: string;
+  craft: string;
   inStock: boolean;
-  featured: boolean;
-  trending: boolean;
-  reviews: number;
-  soldCount: number;
+  /** Null until the piece has been reviewed — there is no invented default. */
+  rating: number | null;
+  reviewCount: number;
 };
 
+/**
+ * Contract: GET /api/listings embeds the artisan on every listing, and the
+ * response is projected — `description` arrives truncated, and `story`,
+ * `transcription` and `reviews` are not sent at all. Nothing in the grid reads
+ * those; the full document is on GET /api/listings/{id}.
+ */
 type ListingFromApi = {
   _id: string;
   title?: string;
   description?: string;
-  suggested_price?: number | string;
+  /** Canonical. `suggested_price` is a legacy display string and is not used. */
+  price?: number;
   image_ids?: string[];
-  artist_id: string;
+  artist_id?: string;
   status?: string;
   category?: string;
   tags?: string[];
+  rating?: number | null;
+  review_count?: number;
+  artisan?: {
+    id?: string;
+    name?: string;
+    craft?: string;
+    region?: string;
+    location?: string;
+  };
 };
 
-type ArtistData = {
-  name?: string;
-  display_name?: string;
-  region?: string;
-  state?: string;
+/**
+ * Everything the listings request depends on, in one piece of state.
+ *
+ * It used to be six separate states plus an effect that reset the page number,
+ * which meant every filter change fired two full rounds of requests: one for the
+ * new filters and one for the page reset. Updating them together is a single
+ * render and a single request.
+ */
+type Query = {
+  page: number;
+  search: string;
+  minPrice: number;
+  maxPrice: number;
+  category: string;
+  region: string;
 };
 
-// Custom hook for debounced value
+const INITIAL_QUERY: Query = {
+  page: 1,
+  search: "",
+  minPrice: 0,
+  maxPrice: MAX_PRICE,
+  category: "all",
+  region: "all",
+};
+
 function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
+  const [debounced, setDebounced] = useState<T>(value);
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
   }, [value, delay]);
-
-  return debouncedValue;
+  return debounced;
 }
 
-export default function Marketplace() {
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  
-  // Debounce search query to avoid API calls on every keystroke
-  const debouncedSearchQuery = useDebounce(searchQuery, 300); // Reduced from 500ms to 300ms
-  
-  // Separate filter states for UI and applied filters
-  const [tempPriceRange, setTempPriceRange] = useState([0, 20000]);
-  const [tempSelectedCraft, setTempSelectedCraft] = useState("all");
-  const [tempSelectedState, setTempSelectedState] = useState("all");
-  
-  // Applied filter states (used for API calls)
-  const [appliedPriceRange, setAppliedPriceRange] = useState([0, 20000]);
-  const [appliedSelectedCraft, setAppliedSelectedCraft] = useState("all");
-  const [appliedSelectedState, setAppliedSelectedState] = useState("all");
-  
-  const [viewMode, setViewMode] = useState("grid");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isVoiceSearch, setIsVoiceSearch] = useState(false);
-  const [voiceStatus, setVoiceStatus] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const itemsPerPage = 12;
-  const { profile } = useAuthContext();
+function toPrice(raw: number | undefined): number {
+  return typeof raw === "number" && Number.isFinite(raw) ? Math.round(raw) : 0;
+}
+
+/**
+ * Reading search params opts a route out of prerendering unless it sits behind a
+ * Suspense boundary. Isolating the one thing that needs them — the post-Stripe
+ * `?success=true` bounce — lets the whole rest of the page ship as static HTML
+ * instead of an empty skeleton.
+ */
+function CheckoutSuccessRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -108,642 +115,432 @@ export default function Marketplace() {
     }
   }, [searchParams, router]);
 
-  // Reset page when search query or applied filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
+  return null;
+}
 
-  // Fetch listings when page, search query, or applied filters change
-  const fetchListings = useCallback(async () => {
-    // Don't show loading for search - only show searching indicator
-    if (debouncedSearchQuery.length > 0) {
-      setIsSearching(true);
-    } else {
+export default function Marketplace() {
+  const [query, setQuery] = useState<Query>(INITIAL_QUERY);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Draft filter values — only pushed into `query` when Apply is pressed.
+  const [draftPrice, setDraftPrice] = useState<number[]>([0, MAX_PRICE]);
+  const [draftCategory, setDraftCategory] = useState("all");
+  const [draftRegion, setDraftRegion] = useState("all");
+
+  const [isListening, setIsListening] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // A new search term always means page 1 — set both in one update.
+  useEffect(() => {
+    setQuery((q) => (q.search === debouncedSearch ? q : { ...q, search: debouncedSearch, page: 1 }));
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    // Supersede any request still in flight for older filters.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const run = async () => {
       setIsLoading(true);
-    }
-    
-    try {
-      const skip = (currentPage - 1) * itemsPerPage;
-      const params = new URLSearchParams({
-        skip: skip.toString(),
-        limit: itemsPerPage.toString(),
-        search: debouncedSearchQuery,
-        min_price: appliedPriceRange[0].toString(),
-        max_price: appliedPriceRange[1].toString(),
-        category: appliedSelectedCraft,
-        state: appliedSelectedState
-      });
+      try {
+        const qs = buildQuery({
+          skip: (query.page - 1) * PAGE_SIZE,
+          // The API caps `limit` at 100 and 422s above it.
+          limit: PAGE_SIZE,
+          search: query.search,
+          // Price bounds are unbounded server-side by default, so send a bound
+          // only when the buyer has actually moved that end of the slider.
+          min_price: query.minPrice > 0 ? query.minPrice : undefined,
+          max_price: query.maxPrice < MAX_PRICE ? query.maxPrice : undefined,
+          category: query.category,
+          state: query.region,
+        });
 
-      // Remove empty or 'all' values to clean up the API call
-      if (!debouncedSearchQuery.trim()) params.delete('search');
-      if (appliedSelectedCraft === 'all') params.delete('category');
-      if (appliedSelectedState === 'all') params.delete('state');
-      
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings?${params}`);
-      
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      
-      const data = await res.json();
-      
-      // Check if data has the expected structure
-      if (!data.listings || !Array.isArray(data.listings)) {
-        throw new Error('Invalid response structure from API');
-      }
-      
-      const products = await Promise.all(
-        (data.listings as ListingFromApi[]).map(async (item: ListingFromApi) => {
-          let artistData: ArtistData = {};
-          try {
-            const artistId = item.artist_id ?? "";
-            console.log("Fetching artist data for ID:", artistId);
-            const artistRes = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/public/${artistId}`);
-            if (artistRes.ok) artistData = await artistRes.json();
-          } catch {
-            artistData = { name: "Traditional Artisan", region: "Unknown", state: "India" };
-          }
+        const res = await fetch(`${API_BASE_URL}/api/listings${qs}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Could not load listings (${res.status})`);
 
-          const suggestedPriceStr = (item.suggested_price ?? "299").toString();
-          const parsedPrice = parseInt(suggestedPriceStr.replace(/\D/g, "")) || 299;
+        const data = await res.json();
+        if (!Array.isArray(data?.listings)) throw new Error("Unexpected response from the listings service");
 
-          return {
+        // One request, not 1 + 12: the artisan now arrives embedded on each listing.
+        setProducts(
+          (data.listings as ListingFromApi[]).map((item) => ({
             id: item._id,
-            title: item.title || "Untitled Product",
-            description: item.description || "No description available",
-            price: parsedPrice,
-            originalPrice: Math.round(parsedPrice * 1.2),
+            title: item.title || "Untitled",
+            description: item.description || "",
+            price: toPrice(item.price),
             image: item.image_ids?.[0]
-              ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/listings/${item._id}/images/${item.image_ids[0]}`
-              : "/placeholder.svg",
-            artisan: {
-              name: artistData.name || artistData.display_name || "Unknown",
-              location: `${artistData.region ?? "Unknown"}, ${artistData.state ?? "India"}`,
-              rating: 4.8,
-              craft: item.category ?? "Art",
-              verified: true,
-            },
-            category: item.category ?? "Art",
-            tags: item.tags || [],
+              ? `${API_BASE_URL}/api/listings/${item._id}/images/${item.image_ids[0]}`
+              : undefined,
+            artisanName: item.artisan?.name || "Independent maker",
+            region: item.artisan?.region || item.artisan?.location || "",
+            craft: item.artisan?.craft || item.category || "Craft",
             inStock: item.status === "active",
-            featured: Math.random() > 0.7,
-            trending: Math.random() > 0.8,
-            reviews: Math.floor(Math.random() * 50) + 10,
-            soldCount: Math.floor(Math.random() * 100) + 20,
-          };
-        })
-      );
-      setAllProducts(products);
-      setTotalCount(data.total || 0);
-      setError(null); // Clear any previous errors
-    } catch (err) {
-      console.error('Error fetching listings:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch listings');
-      setAllProducts([]);
-      setTotalCount(0);
-    } finally {
-      setIsLoading(false);
-      setIsSearching(false);
+            // Real values now. Nothing here is invented: an unreviewed piece
+            // shows no rating rather than a placeholder one.
+            rating: typeof item.rating === "number" ? item.rating : null,
+            reviewCount: typeof item.review_count === "number" ? item.review_count : 0,
+          })),
+        );
+        setTotalCount(typeof data.total === "number" ? data.total : 0);
+        setError(null);
+      } catch (err) {
+        if (isAbortError(err)) return; // superseded, not a failure
+        console.error("Failed to load listings:", err);
+        // "Failed to fetch" is the browser talking, not the interface. Say what
+        // happened and what to do about it.
+        setError(
+          err instanceof TypeError
+            ? "Could not reach the market. Check your connection and try again."
+            : err instanceof Error
+              ? err.message
+              : "Could not load listings.",
+        );
+        setProducts([]);
+        setTotalCount(0);
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false);
+      }
+    };
+
+    run();
+    return () => controller.abort();
+  }, [query]);
+
+  /*
+    Facet options are derived from the listings on screen, so they narrow as you
+    page. A /api/listings/facets endpoint would fix that properly; noted in the
+    handoff rather than faked here.
+  */
+  const categories = useMemo(
+    () => [...new Set(products.map((p) => p.craft).filter(Boolean))].sort(),
+    [products],
+  );
+  const regions = useMemo(
+    () => [...new Set(products.map((p) => p.region).filter(Boolean))].sort(),
+    [products],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  const applyFilters = useCallback(() => {
+    setQuery((q) => ({
+      ...q,
+      page: 1,
+      minPrice: draftPrice[0],
+      maxPrice: draftPrice[1],
+      category: draftCategory,
+      region: draftRegion,
+    }));
+  }, [draftPrice, draftCategory, draftRegion]);
+
+  const clearFilters = useCallback(() => {
+    setDraftPrice([0, MAX_PRICE]);
+    setDraftCategory("all");
+    setDraftRegion("all");
+    setSearchInput("");
+    setQuery(INITIAL_QUERY);
+  }, []);
+
+  const startVoiceSearch = useCallback(async () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError("This browser cannot listen. Type your search instead.");
+      return;
     }
-  }, [currentPage, debouncedSearchQuery, appliedPriceRange, appliedSelectedCraft, appliedSelectedState]);
 
-  useEffect(() => {
-    fetchListings();
-  }, [fetchListings]);
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    setIsListening(true);
 
-  // Memoize filtered products to avoid recalculation on every render
-  const filteredProducts = useMemo(() => {
-    return allProducts;
-  }, [allProducts]);
-
-  const crafts = useMemo(() => {
-    return [...new Set(allProducts.map((p) => p.category.toLowerCase()))];
-  }, [allProducts]);
-
-  const states = useMemo(() => {
-    return [...new Set(allProducts.map((p) => p.artisan.location.split(",")[1]?.trim().toLowerCase()))];
-  }, [allProducts]);
-
-  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    const target = e.target as HTMLImageElement;
-    target.src = "/placeholder.svg";
-  }, []);
-
-  const handleApplyFilters = useCallback(() => {
-    setAppliedPriceRange(tempPriceRange);
-    setAppliedSelectedCraft(tempSelectedCraft);
-    setAppliedSelectedState(tempSelectedState);
-  }, [tempPriceRange, tempSelectedCraft, tempSelectedState]);
-
-  const handleClearFilters = useCallback(() => {
-    setTempPriceRange([0, 20000]);
-    setTempSelectedCraft("all");
-    setTempSelectedState("all");
-    setAppliedPriceRange([0, 20000]);
-    setAppliedSelectedCraft("all");
-    setAppliedSelectedState("all");
-    setSearchQuery("");
-  }, []);
-
-  const handleQuickSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-  }, []);
-
-  // Handle search input with proper event prevention
-  const handleSearchInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    setSearchQuery(e.target.value);
-  }, []);
-
-  // Handle search form submission (prevent default form behavior)
-  const handleSearchSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    // The search will be triggered by the useEffect watching debouncedSearchQuery
-  }, []);
-
-  const handleVoiceSearch = useCallback(async (searchData: { transcript: string, keywords: string[] }) => {
-    const { language, english, keywords } = await processVoiceTranscription(searchData.transcript);
-    if (language !== 'en') {
-      setSearchQuery(english);
-    } else {
-      setSearchQuery(searchData.transcript);
-    }
+    recognition.onresult = async (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      try {
+        const { english } = await processVoiceTranscription(transcript);
+        setSearchInput(english);
+      } catch {
+        setSearchInput(transcript);
+      } finally {
+        setIsListening(false);
+      }
+    };
+    recognition.onerror = () => {
+      setIsListening(false);
+      setError("Could not hear that. Try again, or type your search.");
+    };
+    recognition.onend = () => setIsListening(false);
+    recognition.start();
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
-      <div className="container mx-auto px-4 py-8">
-        {isLoading && allProducts.length === 0 && (
-          <div className="text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500 mb-4"></div>
-            <p className="text-lg text-gray-700">Loading handcrafted treasures...</p>
-          </div>
-        )}
+    <div className="min-h-screen">
+      <Suspense fallback={null}>
+        <CheckoutSuccessRedirect />
+      </Suspense>
 
+      {/* ------------------------------------------------------ search head */}
+      <section className="border-b border-border bg-secondary/50">
+        <div className="container mx-auto px-4 py-12 lg:py-16">
+          <p className="eyebrow">The market</p>
+          <h1 className="display-lg mt-4 max-w-2xl text-balance">
+            Every piece here was made by one person, by hand
+          </h1>
+
+          <form
+            onSubmit={(e) => e.preventDefault()}
+            role="search"
+            className="mt-8 flex max-w-2xl items-center gap-2"
+          >
+            <div className="relative flex-1">
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search by craft, material or place"
+                aria-label="Search listings"
+                className="h-12 bg-background pl-11 text-base"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={startVoiceSearch}
+              disabled={isListening}
+              aria-label={isListening ? "Listening" : "Search by voice"}
+              className="h-12 w-12 shrink-0 bg-background"
+            >
+              <Mic className={`h-5 w-5 ${isListening ? "animate-pulse text-madder" : ""}`} />
+            </Button>
+          </form>
+
+          {isListening && (
+            <p aria-live="polite" className="mt-3 text-sm text-madder">
+              Listening. Say what you are looking for.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <div className="ajrakh-rule" aria-hidden="true" />
+
+      <div className="container mx-auto px-4 py-10">
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-8">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            </div>
-          </div>
+          <p
+            role="alert"
+            className="mb-8 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </p>
         )}
 
-        {/* Hero Search Section - Always show unless initial loading */}
-        {!(isLoading && allProducts.length === 0) && (
-          <>
-            <div className="text-center mb-12">
-              <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-                  Discover{" "}
-                  <span className="bg-gradient-to-r from-amber-600 to-rose-600 bg-clip-text text-transparent">
-                    Authentic
-                  </span>{" "}
-                  Handmade Treasures
-                </h1>
-                <p className="text-xl text-gray-600 mb-8">
-                  Support local artisans and find unique handcrafted products from across India
+        <div className="flex flex-col gap-10 lg:flex-row">
+          {/* --------------------------------------------------- filter rail */}
+          <aside className="lg:w-64 lg:shrink-0">
+            <h2 className="eyebrow flex items-center gap-2">
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+              Refine
+            </h2>
+
+            <div className="mt-6 space-y-7">
+              <div>
+                <Label className="text-sm font-semibold">Price</Label>
+                <p className="numeric mt-1 text-sm text-muted-foreground">
+                  ₹{draftPrice[0].toLocaleString("en-IN")} – ₹{draftPrice[1].toLocaleString("en-IN")}
                 </p>
+                <Slider
+                  value={draftPrice}
+                  onValueChange={setDraftPrice}
+                  min={0}
+                  max={MAX_PRICE}
+                  step={500}
+                  className="mt-4"
+                  aria-label="Price range"
+                />
+              </div>
 
-                {/* Search Bar with Form */}
-                <form onSubmit={handleSearchSubmit} className="max-w-3xl mx-auto relative mb-8">
-                  <div className="relative">
-                    <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400 w-6 h-6" />
-                    <Input
-                      type="text"
-                      placeholder="Search handmade products, artisans, or locations..."
-                      value={searchQuery}
-                      onChange={handleSearchInput}
-                      className="pl-16 pr-20 py-6 text-lg border-2 border-orange-200 focus:border-orange-400 rounded-2xl bg-white/80 backdrop-blur-sm shadow-lg"
-                    />
-                    <div className="absolute right-16 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className={`p-2 hover:bg-orange-100 rounded-full transition-all duration-200 ${
-                          isVoiceSearch ? 'scale-125 bg-orange-100 shadow-lg' : 'scale-100'
-                        }`}
-                        onClick={async () => {
-                          if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-                            alert('Speech recognition not supported in this browser.');
-                            return;
-                          }
-                          const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-                          const recognition = new SpeechRecognition();
-                          recognition.lang = 'en-US';
-                          recognition.interimResults = false;
-                          recognition.maxAlternatives = 1;
-                          setIsVoiceSearch(true);
-                          setVoiceStatus('Listening...');
-                          recognition.onresult = async (event: any) => {
-                            const transcript = event.results[0][0].transcript;
-                            setVoiceStatus('Processing...');
-                            try {
-                              const { english } = await processVoiceTranscription(transcript);
-                              setSearchQuery(english);
-                              setVoiceStatus('');
-                            } catch (error) {
-                              console.error('Translation error:', error);
-                              setSearchQuery(transcript); // Fallback to original transcript
-                              setVoiceStatus('');
-                            }
-                            setIsVoiceSearch(false);
-                          };
-                          recognition.onerror = () => {
-                            setIsVoiceSearch(false);
-                            setVoiceStatus('');
-                            alert('Voice recognition failed. Please try again.');
-                          };
-                          recognition.onend = () => {
-                            if (voiceStatus === 'Listening...') {
-                              setIsVoiceSearch(false);
-                              setVoiceStatus('');
-                            }
-                          };
-                          recognition.start();
-                        }}
-                        disabled={isVoiceSearch}
-                        aria-label="Voice Search"
-                      >
-                        <Mic className={`w-5 h-5 ${
-                          isVoiceSearch ? 'animate-pulse text-orange-600' : 'text-black hover:text-orange-600'
-                        }`} />
-                      </Button>
-                      {voiceStatus && (
-                        <span className="text-sm text-orange-600 font-medium">{voiceStatus}</span>
-                      )}
-                    </div>
-                    {(isSearching || isVoiceSearch) && (
-                      <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-orange-500"></div>
-                      </div>
-                    )}
-                  </div>
-                </form>
+              <div>
+                <Label htmlFor="filter-craft" className="text-sm font-semibold">
+                  Craft
+                </Label>
+                <Select value={draftCategory} onValueChange={setDraftCategory}>
+                  <SelectTrigger id="filter-craft" className="mt-2">
+                    <SelectValue placeholder="Any craft" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any craft</SelectItem>
+                    {categories.map((craft) => (
+                      <SelectItem key={craft} value={craft}>
+                        {craft}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                {/* Quick Filter Tags */}
-                <div className="flex flex-wrap justify-center gap-3 mb-8">
-                  <Badge
-                    variant="outline"
-                    className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
-                    onClick={() => handleQuickSearch("")}
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    All
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
-                    onClick={() => handleQuickSearch("madhubani")}
-                  >
-                    <TrendingUp className="w-4 h-4 mr-2" />
-                    Madhubani
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
-                    onClick={() => handleQuickSearch("art")}
-                  >
-                    Art
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="px-4 py-2 cursor-pointer hover:bg-orange-50 border-orange-200"
-                    onClick={() => handleQuickSearch("traditional")}
-                  >
-                    Traditional
-                  </Badge>
-                </div>
+              <div>
+                <Label htmlFor="filter-region" className="text-sm font-semibold">
+                  Region
+                </Label>
+                <Select value={draftRegion} onValueChange={setDraftRegion}>
+                  <SelectTrigger id="filter-region" className="mt-2">
+                    <SelectValue placeholder="Anywhere in India" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Anywhere in India</SelectItem>
+                    {regions.map((region) => (
+                      <SelectItem key={region} value={region}>
+                        {region}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <Button type="button" onClick={applyFilters} className="w-full">
+                  Apply
+                </Button>
+                <Button type="button" variant="ghost" onClick={clearFilters} className="w-full">
+                  Clear all
+                </Button>
               </div>
             </div>
+          </aside>
 
-            <div className="flex flex-col lg:flex-row gap-8">
-              {/* Filters Sidebar */}
-              <div className="lg:w-80 space-y-6">
-                <Card className="border-2 border-orange-200 bg-white/80 backdrop-blur-sm shadow-lg">
-                  <CardContent className="p-6">
-                    <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-3 text-lg">
-                      <Filter className="w-5 h-5 text-orange-600" />
-                      Filters
-                    </h3>
+          {/* ------------------------------------------------------- results */}
+          <div className="flex-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border pb-4">
+              <h2 className="display-sm">
+                {query.search ? `“${query.search}”` : "All listings"}
+              </h2>
+              <p className="numeric text-sm text-muted-foreground" aria-live="polite">
+                {isLoading ? "Loading…" : `${totalCount} ${totalCount === 1 ? "piece" : "pieces"}`}
+              </p>
+            </div>
 
-                    <div className="space-y-6">
-                      {/* Price Range */}
-                      <div>
-                        <label className="text-sm font-semibold text-gray-700 mb-3 block">
-                          Price Range: ₹{tempPriceRange[0]} - ₹{tempPriceRange[1]}
-                        </label>
-                        <Slider
-                          value={tempPriceRange}
-                          onValueChange={setTempPriceRange}
-                          max={20000}
-                          min={0}
-                          step={500}
-                          className="w-full"
+            {isLoading ? (
+              <ProductGridSkeleton />
+            ) : products.length === 0 ? (
+              <div className="py-24 text-center">
+                <h3 className="display-sm">Nothing matches that yet</h3>
+                <p className="mt-2 text-muted-foreground">
+                  Widen the price range or clear the filters to see everything.
+                </p>
+                <Button variant="outline" onClick={clearFilters} className="mt-6">
+                  Clear all filters
+                </Button>
+              </div>
+            ) : (
+              <ul className="mt-8 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
+                {products.map((product, index) => (
+                  <li key={product.id}>
+                    <Link href={`/product/${product.id}`} className="group block">
+                      <div className="relative aspect-[4/5] overflow-hidden rounded-md border border-border bg-secondary">
+                        <ProductImage
+                          src={product.image}
+                          alt={product.title}
+                          sizes="(min-width: 1280px) 22rem, (min-width: 640px) 45vw, 92vw"
+                          /* Only the first row is above the fold. */
+                          priority={index < 3}
+                          className="transition-transform duration-500 group-hover:scale-[1.04]"
                         />
-                        <div className="flex justify-between text-xs text-gray-500 mt-2">
-                          <span>₹0</span>
-                          <span>₹20,000</span>
+                        {!product.inStock && (
+                          <span className="absolute left-3 top-3 rounded-sm bg-background/95 px-2 py-1 text-xs font-semibold">
+                            Sold out
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-4">
+                        <p className="eyebrow">{product.craft}</p>
+                        <h3 className="display-sm mt-2 line-clamp-2 group-hover:text-madder">
+                          {product.title}
+                        </h3>
+                        <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          <span className="truncate">
+                            {product.artisanName}
+                            {product.region && `, ${product.region}`}
+                          </span>
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <p className="numeric text-lg font-bold">
+                            ₹{product.price.toLocaleString("en-IN")}
+                          </p>
+                          {product.rating !== null && (
+                            <p className="numeric flex items-center gap-1 text-sm text-muted-foreground">
+                              <Star className="h-3.5 w-3.5 fill-haldi text-haldi" aria-hidden="true" />
+                              {product.rating.toFixed(1)}
+                              <span className="sr-only"> out of 5, </span>
+                              <span>({product.reviewCount})</span>
+                            </p>
+                          )}
                         </div>
                       </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-                      {/* Craft Type */}
-                      <div>
-                        <label className="text-sm font-semibold text-gray-700 mb-3 block">Category</label>
-                        <Select value={tempSelectedCraft} onValueChange={setTempSelectedCraft}>
-                          <SelectTrigger className="border-orange-200 focus:border-orange-400">
-                            <SelectValue placeholder="All categories" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All categories</SelectItem>
-                            {crafts.map((craft) => (
-                              <SelectItem key={craft} value={craft}>
-                                {craft.charAt(0).toUpperCase() + craft.slice(1)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* State */}
-                      <div>
-                        <label className="text-sm font-semibold text-gray-700 mb-3 block">Location</label>
-                        <Select value={tempSelectedState} onValueChange={setTempSelectedState}>
-                          <SelectTrigger className="border-orange-200 focus:border-orange-400">
-                            <SelectValue placeholder="All locations" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All locations</SelectItem>
-                            {states.map((state) => (
-                              <SelectItem key={state} value={state}>
-                                {state.charAt(0).toUpperCase() + state.slice(1)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Filter Action Buttons */}
-                      <div className="space-y-3">
-                        <Button
-                          type="button"
-                          onClick={handleApplyFilters}
-                          className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                        >
-                          Apply Filters
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full border-orange-300 text-orange-600 hover:bg-orange-50 bg-transparent"
-                          onClick={handleClearFilters}
-                        >
-                          Clear All Filters
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Products Section */}
-              <div className="flex-1">
-                {/* Results Header */}
-                <div className="flex items-center justify-between mb-8 bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-orange-200 shadow-sm">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-800">
-                      {debouncedSearchQuery ? `Results for "${debouncedSearchQuery}"` : "All Products"}
-                    </h2>
-                    <p className="text-gray-600 mt-1">
-                      {totalCount} handcrafted treasures found
-                      {isSearching && " (searching...)"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant={viewMode === "grid" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setViewMode("grid")}
-                      className={
-                        viewMode === "grid"
-                          ? "bg-orange-500 hover:bg-orange-600"
-                          : "border-orange-300 text-orange-600 hover:bg-orange-50"
-                      }
-                    >
-                      <Grid className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={viewMode === "list" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className={
-                        viewMode === "list"
-                          ? "bg-orange-500 hover:bg-orange-600"
-                          : "border-orange-300 text-orange-600 hover:bg-orange-50"
-                      }
-                    >
-                      <List className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Pagination Controls */}
-                <div className="flex justify-center items-center gap-4 mb-8">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1 || isLoading || isSearching}
-                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-gray-600">
-                    Page {currentPage} of {Math.ceil(totalCount / itemsPerPage)}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCurrentPage(prev => prev + 1)}
-                    disabled={currentPage >= Math.ceil(totalCount / itemsPerPage) || isLoading || isSearching}
-                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                  >
-                    Next
-                  </Button>
-                </div>
-
-                {/* Products Grid */}
-                <div className="relative">
-                  {isSearching && (
-                    <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
-                      <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-lg">
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-orange-500"></div>
-                        <span className="text-gray-700">Searching...</span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {filteredProducts.length === 0 && !isSearching && !isLoading ? (
-                    <Card className="border-2 border-orange-200 bg-white/80 backdrop-blur-sm">
-                      <CardContent className="p-16 text-center">
-                        <Search className="w-20 h-20 text-gray-400 mx-auto mb-6" />
-                        <h3 className="text-2xl font-semibold text-gray-600 mb-3">No products found</h3>
-                        <p className="text-gray-500 text-lg">
-                          Try adjusting your search or filters to discover more treasures
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div
-                      className={`grid gap-6 ${viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"
-                        }`}
-                    >
-                      {filteredProducts.map((product) => (
-                        <Card
-                          key={product.id}
-                          id={`product-${product.id}`}
-                          className="group border-2 border-orange-200 hover:border-orange-300 transition-all duration-300 hover:shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden"
-                        >
-                          <div className={`${viewMode === "grid" ? "" : "flex"}`}>
-                            <div
-                              className={`relative overflow-hidden ${viewMode === "grid" ? "aspect-[4/3]" : "w-48 h-48 flex-shrink-0"
-                                }`}
-                            >
-                              <img
-                                src={product.image}
-                                alt={product.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                onError={handleImageError}
-                              />
-                              {/* Overlay Badges */}
-                              <div className="absolute top-2 left-2 flex flex-col gap-1">
-                                {product.featured && (
-                                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg text-xs">
-                                    <Sparkles className="w-3 h-3 mr-1" />
-                                    Featured
-                                  </Badge>
-                                )}
-                                {product.trending && (
-                                  <Badge className="bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg text-xs">
-                                    <TrendingUp className="w-3 h-3 mr-1" />
-                                    Trending
-                                  </Badge>
-                                )}
-                              </div>
-
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 hover:bg-white shadow-lg rounded-full p-1.5"
-                              >
-                                <Heart className="w-4 h-4 text-gray-600 hover:text-red-500" />
-                              </Button>
-
-                              {/* Discount Badge */}
-                              {product.originalPrice > product.price && (
-                                <Badge className="absolute bottom-2 right-2 bg-red-500 text-white shadow-lg text-xs">
-                                  {Math.round((1 - product.price / product.originalPrice) * 100)}% OFF
-                                </Badge>
-                              )}
-                            </div>
-
-                            <CardContent className={`${viewMode === "grid" ? "p-4" : "p-6 flex-1"}`}>
-                              <div className="space-y-3">
-                                <div>
-                                  <h3 className="font-semibold text-gray-800 text-base line-clamp-2 group-hover:text-orange-600 transition-colors mb-1">
-                                    {product.title}
-                                  </h3>
-                                  <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed">
-                                    {product.description}
-                                  </p>
-                                </div>
-
-                                {/* Artisan Info */}
-                                <div className="flex items-center gap-2 text-xs">
-                                  <div className="flex items-center gap-1 text-gray-600">
-                                    <MapPin className="w-3 h-3" />
-                                    <span className="font-medium truncate">{product.artisan.name}</span>
-                                    {product.artisan.verified && (
-                                      <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                                        <span className="text-white text-xs">✓</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Rating & Reviews */}
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-1">
-                                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-xs font-semibold">{product.artisan.rating}</span>
-                                    <span className="text-xs text-gray-500">({product.reviews})</span>
-                                  </div>
-                                  <Badge variant="outline" className="border-orange-200 text-orange-700 text-xs">
-                                    {product.category}
-                                  </Badge>
-                                </div>
-
-                                {/* Price and Buy Now Button */}
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-lg font-bold text-orange-600">₹{product.price}</span>
-                                    {product.originalPrice > product.price && (
-                                      <span className="text-xs text-gray-500 line-through">₹{product.originalPrice}</span>
-                                    )}
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-3 py-1.5 text-xs font-semibold shadow"
-                                    onClick={() => {
-                                      if (!profile) {
-                                        window.location.href = "/buyer/login";
-                                        return;
-                                      }
-                                      window.location.href = `/product/${product.id}`;
-                                    }}
-                                  >
-                                    Buy Now
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+            {totalPages > 1 && (
+              <nav aria-label="Pagination" className="mt-16 flex items-center justify-between gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setQuery((q) => ({ ...q, page: Math.max(1, q.page - 1) }))}
+                  disabled={query.page === 1 || isLoading}
+                >
+                  Previous
+                </Button>
+                <p className="numeric text-sm text-muted-foreground">
+                  Page {query.page} of {totalPages}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setQuery((q) => ({ ...q, page: Math.min(totalPages, q.page + 1) }))}
+                  disabled={query.page >= totalPages || isLoading}
+                >
+                  Next
+                </Button>
+              </nav>
+            )}
+          </div>
+        </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes pulse {
-          0%, 100% {
-            box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
-          }
-          50% {
-            box-shadow: 0 0 0 10px rgba(249, 115, 22, 0.2);
-          }
-        }
-        
-        .highlight-new {
-          animation: pulse 1.5s ease-in-out infinite;
-          border-color: rgba(249, 115, 22, 0.5) !important;
-        }
-      `}</style>
     </div>
-  )
+  );
+}
+
+function ProductGridSkeleton() {
+  return (
+    <ul
+      className="mt-8 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3"
+      aria-hidden="true"
+    >
+      {Array.from({ length: 6 }).map((_, i) => (
+        <li key={i}>
+          <Skeleton className="aspect-[4/5] w-full rounded-md" />
+          <Skeleton className="mt-4 h-3 w-16" />
+          <Skeleton className="mt-3 h-5 w-4/5" />
+          <Skeleton className="mt-3 h-4 w-1/2" />
+          <Skeleton className="mt-4 h-6 w-24" />
+        </li>
+      ))}
+    </ul>
+  );
 }

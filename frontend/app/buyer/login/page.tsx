@@ -22,10 +22,10 @@ export default function BuyerLoginPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">
-      <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-xl shadow-xl">
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-full max-w-md space-y-8 bg-card p-8 rounded-xl shadow-xl">
         <div className="flex flex-col items-center justify-center space-y-4">
-          <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">
+          <h2 className="text-center text-3xl font-bold tracking-tight text-foreground">
             Welcome to Kalamitra
           </h2>
           <p className="text-center text-muted-foreground text-lg">
@@ -35,10 +35,10 @@ export default function BuyerLoginPage() {
 
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-gray-300" />
+            <span className="w-full border-t border-border" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-muted-foreground">
+            <span className="bg-card px-2 text-muted-foreground">
               Continue with
             </span>
           </div>
@@ -47,7 +47,7 @@ export default function BuyerLoginPage() {
         <div className="space-y-6">
           <Button
             onClick={handleGoogleSignIn}
-            className="w-full flex items-center justify-center space-x-3 h-12 text-base bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 text-white hover:opacity-90 rounded-lg shadow-lg"
+            className="w-full flex items-center justify-center space-x-3 h-12 text-base bg-madder text-primary-foreground hover:opacity-90 rounded-lg shadow-lg"
           >
             <Image
               src="/google.svg"

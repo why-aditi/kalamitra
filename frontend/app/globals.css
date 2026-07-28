@@ -2,19 +2,108 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
+/*
+  Kalamitra design system — "Ajrakh"
+  ----------------------------------
+  Direction is taken from Ajrakh resist block-printing (Kutch / Sindh): a vat-indigo
+  ground, madder-root red, turmeric yellow and undyed khadi cotton. Deliberately not
+  the orange-gradient-on-cream that every craft marketplace defaults to.
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
+  One system, one place. Every colour below is an HSL triplet consumed by
+  tailwind.config.ts as hsl(var(--token)), so `dark` on <html> flips the whole app.
+*/
 
 @layer base {
   :root {
-    --radius: 0.5rem;
+    /* --- ground & ink --- */
+    --background: 40 30% 98%;          /* paper, faintly warm — not cream */
+    --foreground: 225 45% 11%;         /* indigo-black ink, never pure #000 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 225 45% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 45% 11%;
+
+    /* --- nila / indigo: the brand voice --- */
+    --primary: 225 38% 29%;
+    --primary-foreground: 40 30% 98%;
+
+    /* --- khadi: undyed cotton, used for quiet surfaces --- */
+    --secondary: 40 26% 94%;
+    --secondary-foreground: 225 38% 29%;
+
+    --muted: 40 22% 95%;
+    --muted-foreground: 224 12% 44%;
+
+    /* subtle interactive tint (menu hover, focus rows) */
+    --accent: 216 38% 95%;
+    --accent-foreground: 225 38% 29%;
+
+    /* --- manjistha / madder root: the single hot accent --- */
+    --madder: 4 58% 42%;
+    --madder-foreground: 40 30% 98%;
+    --madder-soft: 8 60% 94%;
+
+    /* --- haldi / turmeric: highlight, price, rating --- */
+    --haldi: 38 78% 48%;
+    --haldi-foreground: 225 45% 11%;
+    --haldi-soft: 42 75% 92%;
+
+    /* --- neem: the only positive-state green --- */
+    --neem: 152 30% 30%;
+    --neem-soft: 152 30% 93%;
+
+    --destructive: 4 62% 46%;
+    --destructive-foreground: 40 30% 98%;
+
+    --border: 36 18% 88%;
+    --input: 36 18% 86%;
+    --ring: 225 38% 29%;
+
+    --radius: 0.375rem;
+  }
+
+  .dark {
+    /* the indigo vat itself */
+    --background: 226 34% 8%;
+    --foreground: 40 24% 92%;
+
+    --card: 226 28% 12%;
+    --card-foreground: 40 24% 92%;
+
+    --popover: 226 28% 12%;
+    --popover-foreground: 40 24% 92%;
+
+    --primary: 222 52% 70%;
+    --primary-foreground: 226 40% 10%;
+
+    --secondary: 226 22% 17%;
+    --secondary-foreground: 40 24% 92%;
+
+    --muted: 226 22% 16%;
+    --muted-foreground: 222 14% 64%;
+
+    --accent: 226 24% 20%;
+    --accent-foreground: 40 24% 92%;
+
+    --madder: 4 62% 58%;
+    --madder-foreground: 226 40% 10%;
+    --madder-soft: 4 34% 20%;
+
+    --haldi: 40 74% 60%;
+    --haldi-foreground: 226 40% 10%;
+    --haldi-soft: 38 32% 20%;
+
+    --neem: 152 34% 58%;
+    --neem-soft: 152 26% 17%;
+
+    --destructive: 4 62% 56%;
+    --destructive-foreground: 226 40% 10%;
+
+    --border: 226 20% 21%;
+    --input: 226 20% 24%;
+    --ring: 222 52% 70%;
   }
 }
 
@@ -22,7 +111,151 @@ body {
   * {
     @apply border-border;
   }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "kern", "liga", "calt";
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: hsl(var(--haldi) / 0.35);
+  }
+
+  /* Visible keyboard focus everywhere, without the mouse-click halo. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* ---------------------------------------------------------------- type scale */
+
+@layer components {
+  .font-display {
+    font-family: var(--font-display), ui-serif, Georgia, serif;
+    font-variation-settings: "SOFT" 24, "WONK" 1;
+  }
+
+  /* Fraunces at display sizes: tight, optical, confident. */
+  .display-xl {
+    @apply font-display;
+    font-size: clamp(2.75rem, 1.6rem + 4.6vw, 5rem);
+    font-weight: 600;
+    line-height: 0.96;
+    letter-spacing: -0.025em;
+  }
+
+  .display-lg {
+    @apply font-display;
+    font-size: clamp(2rem, 1.3rem + 2.8vw, 3.25rem);
+    font-weight: 600;
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+  }
+
+  .display-md {
+    @apply font-display;
+    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+  }
+
+  .display-sm {
+    @apply font-display;
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+
+  /* Section labels. Karla, small, wide — the utility voice. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    @apply text-muted-foreground;
+  }
+
+  .lede {
+    font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+    line-height: 1.6;
+    @apply text-muted-foreground;
+  }
+
+  /* Prices and quantities read as data, not prose. */
+  .numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* ------------------------------------------------------------- the signature */
+
+/*
+  The Ajrakh rule. A block-print lattice — two resist diamonds and two dots per
+  repeat — tiled as an inline SVG so it costs no request. This is the one
+  ornamental device in the system; everything else stays flat and quiet.
+*/
+@layer components {
+  .ajrakh-rule {
+    height: 12px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12' viewBox='0 0 24 12'%3E%3Cg fill='none' stroke='%23A9332C' stroke-width='0.9'%3E%3Cpath d='M0 6 6 0l6 6-6 6z'/%3E%3Cpath d='M12 6 18 0l6 6-6 6z'/%3E%3C/g%3E%3Ccircle cx='6' cy='6' r='1.15' fill='%23A9332C'/%3E%3Ccircle cx='18' cy='6' r='1.15' fill='%23A9332C'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: center;
+    opacity: 0.5;
+  }
+
+  .dark .ajrakh-rule {
+    opacity: 0.55;
+    filter: saturate(1.5) brightness(1.7);
+  }
+
+  /* Same lattice, dropped to a whisper, as the hero ground. Used once. */
+  .ajrakh-field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'%3E%3Cg fill='none' stroke='%232B3A67' stroke-width='0.8'%3E%3Cpath d='M0 12 12 0l12 12-12 12z'/%3E%3Cpath d='M24 12 36 0l12 12-12 12z'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='1.6' fill='%232B3A67'/%3E%3Ccircle cx='36' cy='12' r='1.6' fill='%232B3A67'/%3E%3C/svg%3E");
+    opacity: 0.035;
+  }
+
+  .dark .ajrakh-field {
+    opacity: 0.07;
+    filter: invert(1) brightness(2.2);
+  }
+
+  /* A hairline that thickens to madder on the left — used on quoted stories. */
+  .rule-madder {
+    @apply border-l-2;
+    border-color: hsl(var(--madder));
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+
+/* ------------------------------------------------------------------- motion */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

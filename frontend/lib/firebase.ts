@@ -1,6 +1,5 @@
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getAnalytics, isSupported } from 'firebase/analytics';
 import { api } from './api-client';
 import { AuthUser, UserProfile } from '@/types/auth';
 
@@ -18,9 +17,17 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Initialize Analytics
-let analytics = null;
-isSupported().then(yes => yes && (analytics = getAnalytics(app)));
+/**
+ * Analytics is loaded on demand, never at module scope. It used to be imported
+ * here, which pulled firebase/analytics into the same chunk as auth — i.e. into
+ * the critical path of the render-blocking auth check.
+ */
+export const initAnalytics = async () => {
+  if (typeof window === 'undefined') return null;
+  const { getAnalytics, isSupported } = await import('firebase/analytics');
+  if (!(await isSupported())) return null;
+  return getAnalytics(app);
+};
 
 // Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
@@ -72,4 +79,4 @@ export const getAuthInstance = () => auth;
 // Get current user
 export const getCurrentUser = () => auth.currentUser;
 
-export { app, auth, analytics };
+export { app, auth };

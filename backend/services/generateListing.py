@@ -1,15 +1,75 @@
 import google.generativeai as genai
 import os
 import json
+import logging
 from typing import List, Dict, Any
-from fastapi import UploadFile # Keep for type hinting in create_listing, but not used directly in this function
 import asyncio
+from dotenv import load_dotenv
 from PIL import Image
 import io
-from models.listingModel import Listing # Assuming Listing model defines these fields
+
+# This module reads GEMINI_API_KEY at import time, and it is now imported from
+# two places (routes/listing.py and routes/ai.py). Whichever import happens
+# first must still see the .env file - main.py's own load_dotenv() runs after
+# its route imports. Same reason services/database.py and routes/stripe.py call
+# it; python-dotenv never overrides an already-set variable, so repeat calls are
+# harmless.
+load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Configure Gemini API
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "45"))
+
+# The model object was rebuilt on every single request. Build it once, lazily,
+# so importing this module never depends on the API key being present.
+_model = None
+_model_lock = asyncio.Lock()
+
+
+async def _get_model():
+    global _model
+    if _model is None:
+        async with _model_lock:
+            if _model is None:
+                _model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+    return _model
+
+
+async def generate_text(prompt: str, timeout: float = None) -> str:
+    """Single-shot, text-only Gemini call.
+
+    The one entry point for prompt-in/text-out generation, so there is exactly
+    one place that owns the model cache, the worker-thread offload and the
+    timeout. `routes/ai.py` (the browser-facing proxy that replaced
+    NEXT_PUBLIC_GEMINI_API_KEY) is its only caller today.
+
+    Raises `asyncio.TimeoutError` on timeout and whatever the SDK raises
+    otherwise - deliberately: the caller owns the HTTP mapping, and swallowing
+    the failure here would hide it from the response.
+    """
+    model = await _get_model()
+    response = await asyncio.wait_for(
+        asyncio.to_thread(model.generate_content, prompt),
+        timeout=timeout if timeout is not None else GEMINI_TIMEOUT_SECONDS,
+    )
+    text = (response.text or "").strip()
+    if not text:
+        raise ValueError("Gemini returned an empty response")
+    return text
+
+
+def _decode_and_resize(img_content: bytes) -> Image.Image:
+    """PIL decode + LANCZOS resize are CPU-bound; callers run this in a thread."""
+    pil_image = Image.open(io.BytesIO(img_content))
+    pil_image.load()
+    if pil_image.size[0] > 1024 or pil_image.size[1] > 1024:
+        pil_image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+    return pil_image
+
 
 # Modified function signature to accept List[bytes] for images
 async def generate_listing_with_gemini(transcription: str, image_bytes_list: List[bytes]) -> Dict[str, Any]:
@@ -24,20 +84,14 @@ async def generate_listing_with_gemini(transcription: str, image_bytes_list: Lis
         Dictionary containing generated listing data matching the Listing model
     """
     try:
-        # Initialize the model
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = await _get_model()
 
-        # Process images for Gemini
-        processed_images = []
-        for img_content in image_bytes_list: # Iterate through bytes content directly
-            # Convert to PIL Image
-            pil_image = Image.open(io.BytesIO(img_content))
-
-            # Resize if too large (Gemini has size limits)
-            if pil_image.size[0] > 1024 or pil_image.size[1] > 1024:
-                pil_image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-
-            processed_images.append(pil_image)
+        # Decode/resize off the event loop - this used to block every other
+        # request in the process for the duration of the resize.
+        processed_images = await asyncio.gather(
+            *(asyncio.to_thread(_decode_and_resize, c) for c in image_bytes_list)
+        )
+        processed_images = list(processed_images)
 
         # Create the prompt for creative product listings
         prompt = f"""
@@ -103,8 +157,12 @@ async def generate_listing_with_gemini(transcription: str, image_bytes_list: Lis
         content = [prompt]
         content.extend(processed_images)
 
-        # Generate response
-        response = await asyncio.to_thread(model.generate_content, content)
+        # Generate response. Bounded: a hung Gemini call used to be able to
+        # pin a request forever (there were no timeouts anywhere).
+        response = await asyncio.wait_for(
+            asyncio.to_thread(model.generate_content, content),
+            timeout=GEMINI_TIMEOUT_SECONDS,
+        )
 
         # Parse the response
         response_text = response.text.strip()
@@ -127,9 +185,11 @@ async def generate_listing_with_gemini(transcription: str, image_bytes_list: Lis
 
         return listing_data
 
-    except Exception as e:
-        print(f"Error generating art listing with Gemini: {str(e)}")
-        # Return fallback listing
+    except asyncio.TimeoutError:
+        logger.error("Gemini timed out after %ss; using fallback listing", GEMINI_TIMEOUT_SECONDS)
+        return create_fallback_product_listing(transcription)
+    except Exception:
+        logger.exception("Error generating listing with Gemini; using fallback")
         return create_fallback_product_listing(transcription)
 
 def create_fallback_product_listing(transcription: str) -> Dict[str, Any]:

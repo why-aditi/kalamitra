@@ -1,83 +1,52 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { api, isAbortError } from "@/lib/api-client";
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+export interface TranslatedSearch {
+  language: string;
+  english: string;
+  keywords: string[];
+}
 
-// Utility to detect language and translate using Gemini
-export async function detectLanguageAndTranslate(text: string): Promise<{ language: string; english: string; keywords: string[] }> {
+// The server's cap on POST /api/search/translate. Over-long dictation is
+// clipped here rather than bounced back as a 422.
+const MAX_SEARCH_CHARS = 500;
+
+/**
+ * Normalise a (usually voice-dictated) search phrase: detect its language and
+ * reduce it to clean English search terms.
+ *
+ * This used to call Gemini directly from the browser using
+ * NEXT_PUBLIC_GEMINI_API_KEY, which Next.js inlines into the public bundle —
+ * the key was readable by anyone who opened DevTools. The prompt and the key
+ * now live behind POST /api/search/translate.
+ *
+ * That endpoint never returns 5xx: if Gemini fails it applies the same
+ * heuristics server-side and still answers 200. The local fallbacks below
+ * therefore only cover the network itself being unavailable — and they are the
+ * reason `detectLanguage` and `extractKeywords` stay in this file.
+ */
+export async function detectLanguageAndTranslate(text: string): Promise<TranslatedSearch> {
   try {
-    const prompt = `You are a language processing assistant for an Indian handicrafts marketplace. Analyze the following text and respond with ONLY a valid JSON object (no markdown, no code blocks, no extra text).
+    const result = await api.post<TranslatedSearch>(
+      '/api/search/translate',
+      { text: text.slice(0, MAX_SEARCH_CHARS) },
+      { optionalAuth: true }
+    );
 
-    Tasks:
-    1. Detect the language (use ISO codes: "en" for English, "hi" for Hindi, "bn" for Bengali, "ta" for Tamil, "te" for Telugu, "mr" for Marathi, "gu" for Gujarati, "kn" for Kannada, "ml" for Malayalam, "pa" for Punjabi, "or" for Odia, "as" for Assamese)
-    2. Extract the core search terms from the user's intent. Remove filler words like "I want", "show me", "find me", etc. Focus ONLY on the product/craft they're looking for.
-    3. Provide clean search keywords optimized for product search (focus on: product types, materials, techniques, regions, colors, styles)
-
-    Examples:
-    - "मुझे मधुबनी पेंटिंग चाहिए" → "Madhubani painting"
-    - "I want silk sarees from Banarasi" → "Banarasi silk sarees"
-    - "Show me pottery from Rajasthan" → "Rajasthan pottery"
-
-    Input text: "${text}"
-
-    Response format (JSON only):
-    {"language":"xx","english":"clean search terms","keywords":["word1","word2","word3"]}`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const responseText = response.text();
-    
-    try {
-      // Extract JSON from markdown code blocks if present
-      let jsonText = responseText.trim();
-      
-      // Remove markdown code block markers if they exist
-      if (jsonText.startsWith('```json')) {
-        jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (jsonText.startsWith('```')) {
-        jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-      
-      const parsedResponse = JSON.parse(jsonText);
-      return {
-        language: parsedResponse.language || 'en',
-        english: parsedResponse.english || text,
-        keywords: parsedResponse.keywords || extractKeywords(text)
-      };
-    } catch (parseError) {
-      console.error('Error parsing Gemini response:', parseError);
-      console.log('Raw response text:', responseText);
-      
-      // Try to extract JSON manually as fallback
-      try {
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsedResponse = JSON.parse(jsonMatch[0]);
-          return {
-            language: parsedResponse.language || 'en',
-            english: parsedResponse.english || text,
-            keywords: parsedResponse.keywords || extractKeywords(text)
-          };
-        }
-      } catch (secondParseError) {
-        console.error('Second parse attempt failed:', secondParseError);
-      }
-      
-      // Fallback to simple detection and extraction
-      return {
-        language: detectLanguage(text),
-        english: text,
-        keywords: extractKeywords(text)
-      };
-    }
+    // Trust the shape, but never hand back an empty search: a 429 body or a
+    // future contract change must not blank the search box.
+    return {
+      language: result?.language || detectLanguage(text),
+      english: result?.english?.trim() || text,
+      keywords: result?.keywords?.length ? result.keywords : extractKeywords(text),
+    };
   } catch (error) {
-    console.error('Error with Gemini API:', error);
-    // Fallback to simple detection and extraction
+    if (!isAbortError(error)) {
+      console.error('Search translation failed; using local keyword extraction:', error);
+    }
     return {
       language: detectLanguage(text),
       english: text,
-      keywords: extractKeywords(text)
+      keywords: extractKeywords(text),
     };
   }
 }

@@ -150,38 +150,38 @@ export default function ArtisanProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center animate-pulse">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          <div className="w-16 h-16 mx-auto mb-4 bg-madder rounded-full flex items-center justify-center animate-pulse">
+            <Loader2 className="w-8 h-8 text-primary-foreground animate-spin" />
           </div>
-          <p className="text-gray-600">Loading your profile...</p>
+          <p className="text-muted-foreground">Loading your profile...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 p-4">
+    <div className="min-h-screen p-4">
       <div className="container mx-auto py-8">
         <div className="max-w-4xl mx-auto">
           {/* Header Section */}
           <div className="text-center mb-8">
-            <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
-              <User className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 mx-auto mb-4 bg-madder rounded-full flex items-center justify-center shadow-lg">
+              <User className="w-10 h-10 text-primary-foreground" />
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold bg-madder bg-clip-text text-transparent">
               Profile Settings
             </h1>
-            <p className="text-gray-600 mt-2">Manage your artisan profile information</p>
+            <p className="text-muted-foreground mt-2">Manage your artisan profile information</p>
           </div>
 
-          <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-b border-amber-200/50">
+          <Card className="shadow-xl border-0 bg-card backdrop-blur-sm">
+            <CardHeader className="bg-madder border-b border-border">
               <div className="flex flex-row items-center justify-between">
-                <CardTitle className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
+                <CardTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
+                  <div className="w-8 h-8 bg-madder rounded-lg flex items-center justify-center">
+                    <User className="w-4 h-4 text-primary-foreground" />
                   </div>
                   Profile Information
                 </CardTitle>
@@ -190,7 +190,7 @@ export default function ArtisanProfile() {
                     variant="outline" 
                     size="sm" 
                     onClick={handleEdit}
-                    className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400 transition-all duration-200"
+                    className="border-border text-madder hover:bg-accent hover:border-madder transition-all duration-200"
                   >
                     <Edit className="mr-2 h-4 w-4" />
                     Edit Profile
@@ -202,12 +202,12 @@ export default function ArtisanProfile() {
             <CardContent className="p-8">
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Name Section */}
-                <div className="bg-white/80 py-6">
-                  <Label className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <User className="w-4 h-4 text-amber-600" />
+                <div className="bg-card py-6">
+                  <Label className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                    <User className="w-4 h-4 text-madder" />
                     Full Name
                   </Label>
-                  <div className="text-lg font-semibold text-gray-800 bg-white px-4 py-3 border-amber-200/50 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg h-11 flex items-center shadow-sm hover:from-amber-50 hover:to-orange-50 hover:border-amber-200 transition-all duration-200">
+                  <div className="text-lg font-semibold text-foreground bg-card px-4 py-3 border-border border border-border rounded-lg h-11 flex items-center shadow-sm hover:border-border transition-all duration-200">
                     {profile?.name}
                   </div>
                 </div>
@@ -227,9 +227,9 @@ export default function ArtisanProfile() {
                       <div key={field.id} className="group">
                         <Label 
                           htmlFor={field.id} 
-                          className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2"
+                          className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2"
                         >
-                          {IconComponent && <IconComponent className="w-4 h-4 text-amber-600" />}
+                          {IconComponent && <IconComponent className="w-4 h-4 text-madder" />}
                           {field.label}
                         </Label>
                         {isEditMode ? (
@@ -239,11 +239,11 @@ export default function ArtisanProfile() {
                             value={formData[field.id as keyof typeof formData]}
                             onChange={handleInputChange}
                             placeholder={`Enter ${field.label.toLowerCase()}`}
-                            className="h-11 border-amber-200 focus:border-amber-400 focus:ring-amber-400/20 transition-all duration-200 bg-white shadow-sm"
+                            className="h-11 border-border focus:border-ring focus:ring-ring/20 transition-all duration-200 bg-card shadow-sm"
                           />
                         ) : (
-                          <div className="text-sm font-medium px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg h-11 flex items-center shadow-sm group-hover:from-amber-50 group-hover:to-orange-50 group-hover:border-amber-200 transition-all duration-200">
-                            {field.value || <span className="text-gray-400">Not provided</span>}
+                          <div className="text-sm font-medium px-4 py-3 border border-border rounded-lg h-11 flex items-center shadow-sm group-hover:border-border transition-all duration-200">
+                            {field.value || <span className="text-muted-foreground">Not provided</span>}
                           </div>
                         )}
                       </div>
@@ -252,9 +252,9 @@ export default function ArtisanProfile() {
                 </div>
 
                 {/* Bio Section */}
-                <div className="bg-white/80 py-6">
-                  <Label htmlFor="bio" className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <Edit className="w-4 h-4 text-amber-600" />
+                <div className="bg-card py-6">
+                  <Label htmlFor="bio" className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Edit className="w-4 h-4 text-madder" />
                     Biography
                   </Label>
                   {isEditMode ? (
@@ -265,25 +265,25 @@ export default function ArtisanProfile() {
                       onChange={handleInputChange}
                       placeholder="Tell us about yourself and your craft..."
                       rows={4}
-                      className="resize-none border-amber-200 focus:border-amber-400 focus:ring-amber-400/20 transition-all duration-200 bg-white shadow-sm"
+                      className="resize-none border-border focus:border-ring focus:ring-ring/20 transition-all duration-200 bg-card shadow-sm"
                     />
                   ) : (
-                    <div className="text-sm leading-relaxed bg-white px-4 py-3 border-amber-200/50 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg h-11 flex items-center shadow-sm hover:from-amber-50 hover:to-orange-50 hover:border-amber-200 transition-all duration-200whitespace-pre-wrap">
-                      {profile?.bio || <span className="text-gray-400 italic">No biography provided</span>}
+                    <div className="text-sm leading-relaxed bg-card px-4 py-3 border-border border border-border rounded-lg h-11 flex items-center shadow-sm hover:border-border transition-all duration-200 whitespace-pre-wrap">
+                      {profile?.bio || <span className="text-muted-foreground italic">No biography provided</span>}
                     </div>
                   )}
                 </div>
 
                 {/* Action Buttons */}
                 {isEditMode && (
-                  <div className="flex justify-end gap-3 pt-6 border-t border-amber-200/50">
+                  <div className="flex justify-end gap-3 pt-6 border-t border-border">
                     <Button 
                       type="button" 
                       variant="outline" 
                       size="sm"
                       onClick={handleCancel}
                       disabled={saving}
-                      className="border-gray-300 text-gray-600 hover:bg-gray-50 transition-all duration-200"
+                      className="border-border text-muted-foreground hover:bg-accent transition-all duration-200"
                     >
                       <X className="mr-2 h-4 w-4" />
                       Cancel
@@ -292,7 +292,7 @@ export default function ArtisanProfile() {
                       type="submit" 
                       size="sm"
                       disabled={saving}
-                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 min-w-[140px]"
+                      className="bg-madder text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 min-w-[140px]"
                     >
                       {saving ? (
                         <>
@@ -310,7 +310,7 @@ export default function ArtisanProfile() {
           </Card>
 
           {/* Footer */}
-          <div className="text-center mt-8 text-sm text-gray-500">
+          <div className="text-center mt-8 text-sm text-muted-foreground">
             <p>Keep your profile updated to connect with the right opportunities</p>
           </div>
         </div>

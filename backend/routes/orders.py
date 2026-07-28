@@ -1,148 +1,155 @@
-
-from fastapi import APIRouter, HTTPException, status, Depends
-from pymongo import MongoClient
-from bson import ObjectId
+import logging
 from datetime import datetime
-import os
-from motor.motor_asyncio import AsyncIOMotorDatabase # Import for type hinting
-from services.database import Database # Import your Database service
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
+
+from bson import ObjectId
+from bson.errors import InvalidId
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from motor.motor_asyncio import AsyncIOMotorDatabase
+
+from models.orderModel import Order, OrdersResponse
+from services.database import Database
+from utils.image_helpers import get_first_image_url
+from .auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.get("/orders")
-async def get_orders(email: str, db: AsyncIOMotorDatabase = Depends(Database.get_db)):
+MAX_ORDERS = 200
+
+
+def _first_image_id(listing: dict) -> Optional[str]:
+    ids = (listing or {}).get("image_ids") or []
+    if not ids:
+        return None
+    item = ids[0]
+    if isinstance(item, dict) and "$oid" in item:
+        return item["$oid"]
+    if isinstance(item, ObjectId):
+        return str(item)
+    if isinstance(item, str):
+        return item
+    return None
+
+
+@router.get("/orders", response_model=OrdersResponse)
+async def get_orders(
+    email: Optional[str] = Query(
+        None,
+        deprecated=True,
+        description="Ignored. The buyer identity is taken from the bearer token.",
+    ),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(Database.get_db),
+):
+    """The signed-in buyer's own orders.
+
+    Was `GET /api/orders?email=<anyone>` with NO authentication: it returned any
+    user's full order history - name, email, shipping address. The `email` query
+    parameter is now ignored entirely; identity comes from the token.
     """
-    Retrieves orders associated with a specific buyer email from the database.
-    Includes product details and constructs full image URLs.
-    """
-    if not email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email required")
+    buyer_uid = current_user.get("firebase_uid")
+    buyer_email = current_user.get("email")
+
+    if email and buyer_email and email.lower() != (buyer_email or "").lower():
+        logger.warning(
+            "User %s passed a foreign email to GET /orders; ignoring it", buyer_uid
+        )
 
     try:
-        # Access collections via the injected 'db' object
         orders_collection = db.get_collection("orders")
-        listings_collection = db.get_collection("listings")
-        users_collection = db.get_collection("users")
 
-        # Find orders for the given buyer email, sorted by order_date descending
-        raw_orders = await orders_collection.find({"buyerEmail": email}).sort("order_date", -1).to_list(None)
+        # Match on the uid, falling back to the email for pre-existing orders
+        # that predate buyer_id being written.
+        or_clause = [{"buyer_id": buyer_uid}]
+        if buyer_email:
+            or_clause.append({"buyerEmail": buyer_email})
+
+        raw_orders = (
+            await orders_collection.find({"$or": or_clause})
+            .sort("order_date", -1)
+            .to_list(length=MAX_ORDERS)  # was .to_list(None) - unbounded
+        )
+        if not raw_orders:
+            return OrdersResponse(orders=[])
+
+        # --- Batch the two lookups that used to run per order row. --------- #
+        listing_object_ids = []
+        for order_doc in raw_orders:
+            pid = order_doc.get("product_id")
+            if pid:
+                try:
+                    listing_object_ids.append(ObjectId(pid))
+                except (InvalidId, TypeError):
+                    continue
+
+        listings_by_id = {}
+        if listing_object_ids:
+            cursor = db.get_collection("listings").find(
+                {"_id": {"$in": listing_object_ids}}, {"title": 1, "image_ids": 1}
+            )
+            listings_by_id = {str(doc["_id"]): doc async for doc in cursor}
+
+        # The buyer is always the caller, so the per-row users lookup is gone
+        # entirely (it re-fetched the same user document once per order).
+        buyer_name = (
+            current_user.get("display_name")
+            or current_user.get("name")
+            or buyer_email
+            or "Unknown Buyer"
+        )
 
         serialized_orders = []
         for order_doc in raw_orders:
-            # Convert ObjectId to string for the order ID
             order_id_str = str(order_doc["_id"])
-
-            # --- Fetch Product Listing Details ---
-            product_listing = None
-            product_id = order_doc.get("product_id")
-            if product_id:
-                try:
-        # Try ObjectId first
-                    try:
-                        product_listing = await listings_collection.find_one({"_id": ObjectId(product_id)})
-                    except Exception:
-            # If ObjectId fails, try as string
-                        product_listing = await listings_collection.find_one({"_id": product_id})
-                except Exception as e:
-                    print(f"DEBUG_ORDERS_API: Error fetching listing {product_id}: {e}")
+            listing = listings_by_id.get(str(order_doc.get("product_id", "")))
 
             product_title = (
-                product_listing.get("title")
-                if product_listing and product_listing.get("title")
-                else order_doc.get("product_title")
+                (listing or {}).get("title")
+                or order_doc.get("product_title")
                 or order_doc.get("productTitle")
                 or order_doc.get("product_name")
                 or "Unknown Product"
             )
 
-            product_image_url = "/placeholder.svg" # Default placeholder
+            product_image_url = "/placeholder.svg"
+            image_id = _first_image_id(listing)
+            if listing and image_id:
+                # NameError fix: listing_id_str used to be referenced in a
+                # branch where it had never been assigned.
+                product_image_url = get_first_image_url(str(listing["_id"]), [image_id])
 
-            if product_listing and product_listing.get("image_ids"):
-                first_image_id_item = product_listing["image_ids"][0]
-                first_image_id_str = None
+            estimated = order_doc.get("estimated_delivery")
+            delivered = order_doc.get("delivered_date")
 
-                # Handle different types of image_ids (ObjectId, dict with $oid, string)
-                if isinstance(first_image_id_item, dict) and "$oid" in first_image_id_item:
-                    first_image_id_str = first_image_id_item["$oid"]
-                elif isinstance(first_image_id_item, ObjectId):
-                    first_image_id_str = str(first_image_id_item)
-                elif isinstance(first_image_id_item, str):
-                    first_image_id_str = first_image_id_item
-
-                if first_image_id_str:
-                    listing_id_str = str(product_listing["_id"])
-                    api_base_url = os.getenv('NEXT_PUBLIC_API_BASE_URL')
-                    if not api_base_url:
-                        print("DEBUG_ORDERS_API: WARNING: NEXT_PUBLIC_API_BASE_URL environment variable is not set. Using placeholder for image URL.")
-                    else:
-                        product_image_url = f"{api_base_url}/api/listings/{listing_id_str}/images/{first_image_id_str}"
-                else:
-                    print(f"DEBUG_ORDERS_API: No valid image ID extracted for listing {listing_id_str}. Using placeholder.")
-            else:
-                print(f"DEBUG_ORDERS_API: Product listing or image_ids missing for order {order_id_str}. Using placeholder.")
-
-            # --- Fetch Buyer Name ---
-            buyer_name = "Unknown Buyer"
-            if "buyer_id" in order_doc and order_doc["buyer_id"]:
-                buyer_profile = await users_collection.find_one({"firebase_uid": order_doc["buyer_id"]})
-                if buyer_profile:
-                    buyer_name = buyer_profile.get("name") or buyer_profile.get("display_name") or order_doc.get("buyerEmail", "Unknown Buyer")
-            else:
-                buyer_name = order_doc.get("buyerEmail", "Unknown Buyer")
-
-
-            # --- Construct the order object for the frontend ---
-            serialized_orders.append({
-                "id": order_id_str,
-                "productTitle": product_title,
-                "productImage": product_image_url,
-                "buyer": buyer_name,
-                "amount": f"₹{order_doc.get('total_amount', 0):.2f}",
-                "status": order_doc.get("status", "pending"),
-                "date": order_doc.get("order_date", datetime.utcnow()).isoformat(),
-                "quantity": order_doc.get("quantity", 1),
-                "shippingAddress": order_doc.get("shipping_address", "N/A"),
-                "paymentMethod": order_doc.get("payment_method", "N/A"),
-                "trackingNumber": order_doc.get("tracking_number", None),
-                "estimatedDelivery": order_doc.get("estimated_delivery", None),
-                "deliveredDate": order_doc.get("delivered_date", None),
-            })
-        return {"orders": serialized_orders}
-    except Exception as e:
-        print(f"Error fetching orders: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch orders")
-
-
-class Order(BaseModel):
-    id: str
-    productTitle: str
-    productImage: str
-    buyer: str
-    amount: str
-    status: str
-    date: str
-    quantity: int
-    shippingAddress: str
-    paymentMethod: str
-    trackingNumber: Optional[str] = None
-    estimatedDelivery: Optional[str] = None
-    deliveredDate: Optional[str] = None
-
-    class Config:
-        json_encoders = {
-            ObjectId: str,
-            datetime: lambda dt: dt.isoformat()
-        }
-
-class OrdersResponse(BaseModel):
-    orders: List[Order]
-
-    class Config:
-        json_encoders = {
-            ObjectId: str,
-            datetime: lambda dt: dt.isoformat()
-        }
-
-
+            serialized_orders.append(
+                Order(
+                    id=order_id_str,
+                    productTitle=product_title,
+                    productImage=product_image_url,
+                    buyer=buyer_name,
+                    amount=f"₹{order_doc.get('total_amount', 0):.2f}",
+                    status=order_doc.get("status", "pending"),
+                    date=order_doc.get("order_date", datetime.utcnow()).isoformat(),
+                    quantity=order_doc.get("quantity", 1),
+                    shippingAddress=order_doc.get("shipping_address", "N/A"),
+                    paymentMethod=order_doc.get("payment_method", "N/A"),
+                    trackingNumber=order_doc.get("tracking_number"),
+                    estimatedDelivery=estimated.isoformat()
+                    if isinstance(estimated, datetime)
+                    else estimated,
+                    deliveredDate=delivered.isoformat()
+                    if isinstance(delivered, datetime)
+                    else delivered,
+                )
+            )
+        return OrdersResponse(orders=serialized_orders)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error fetching orders for %s", buyer_uid)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch orders",
+        )

@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LoadingPage } from "@/components/ui/loading"
 import { Plus, Eye, Edit, Package, TrendingUp, ShoppingCart, Star, CheckCircle, Clock, AlertCircle } from "lucide-react"
+import { orderStatusClass } from "@/lib/order-status"
+import { ProductImage } from "@/components/product-image"
 
 interface ArtisanProfile {
   id: string
@@ -117,14 +119,14 @@ export default function ArtisanDashboard() {
 
   if (!artisanProfile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle>Welcome to KalaMitra</CardTitle>
             <CardDescription>Please complete your artisan profile to get started.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="w-full bg-orange-500 hover:bg-orange-600" asChild>
+            <Button className="w-full bg-madder hover:bg-madder/90" asChild>
               <Link href="/artisan/onboarding">Complete Profile</Link>
             </Button>
           </CardContent>
@@ -138,19 +140,6 @@ export default function ArtisanDashboard() {
     totalOrders: orders.length,
     totalRevenue: orders.reduce((sum, order) => sum + Number.parseFloat(order.amount.replace("₹", "")), 0), // Use parseFloat
     avgRating: 4.8,
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "confirmed":
-        return "bg-green-100 text-green-800"
-      case "delivered": // Added delivered status color
-        return "bg-blue-100 text-blue-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
   }
 
   const getStatusIcon = (status: string) => {
@@ -167,9 +156,9 @@ export default function ArtisanDashboard() {
   }
 
   return (
-    <div className="bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+    <div className="">
       {showSuccess && (
-        <div className="bg-green-500 text-white px-4 py-3 text-center">
+        <div className="bg-neem text-primary-foreground px-4 py-3 text-center">
           <div className="flex items-center justify-center gap-2">
             <CheckCircle className="w-5 h-5" />
             <span>🎉 Your product has been published successfully!</span>
@@ -178,48 +167,48 @@ export default function ArtisanDashboard() {
       )}
       <div className="container mx-auto px-4 py-8">
         <div className="mx-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {artisanProfile.name}! 👋</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground mb-2">Welcome back, {artisanProfile.name}! 👋</h1>
+          <p className="text-muted-foreground">
             {artisanProfile.craft} artisan from {artisanProfile.region}, {artisanProfile.state}
           </p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 m-8">
-          <Card className="border-orange-200">
+          <Card className="border-border">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Listings</p>
-                <p className="text-3xl font-bold text-gray-800">{stats.totalListings}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Listings</p>
+                <p className="text-3xl font-bold text-foreground">{stats.totalListings}</p>
               </div>
-              <Package className="w-8 h-8 text-orange-500" />
+              <Package className="w-8 h-8 text-madder" />
             </CardContent>
           </Card>
-          <Card className="border-orange-200">
+          <Card className="border-border">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                <p className="text-3xl font-bold text-gray-800">{stats.totalOrders}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
+                <p className="text-3xl font-bold text-foreground">{stats.totalOrders}</p>
               </div>
-              <ShoppingCart className="w-8 h-8 text-orange-500" />
+              <ShoppingCart className="w-8 h-8 text-madder" />
             </CardContent>
           </Card>
-          <Card className="border-orange-200">
+          <Card className="border-border">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-3xl font-bold text-gray-800">₹{stats.totalRevenue.toFixed(2)}</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                <p className="text-3xl font-bold text-foreground">₹{stats.totalRevenue.toFixed(2)}</p>
               </div>
-              <TrendingUp className="w-8 h-8 text-orange-500" />
+              <TrendingUp className="w-8 h-8 text-madder" />
             </CardContent>
           </Card>
-          <Card className="border-orange-200">
+          <Card className="border-border">
             <CardContent className="p-6 flex justify-between items-center">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg Rating</p>
-                <p className="text-3xl font-bold text-gray-800">{stats.avgRating}</p>
+                <p className="text-sm font-medium text-muted-foreground">Avg Rating</p>
+                <p className="text-3xl font-bold text-foreground">{stats.avgRating}</p>
               </div>
-              <Star className="w-8 h-8 text-orange-500" />
+              <Star className="w-8 h-8 text-madder" />
             </CardContent>
           </Card>
         </div>
@@ -234,18 +223,18 @@ export default function ArtisanDashboard() {
 
           <TabsContent value="listings" className="space-y-6 m-8">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-800">My Listings</h2>
-              <Button asChild className="bg-gradient-to-r from-orange-500 to-red-500">
+              <h2 className="text-2xl font-bold text-foreground">My Listings</h2>
+              <Button asChild className="bg-madder">
                 <Link href="/artisan/create-listing">
                   <Plus className="w-4 h-4 mr-2" /> Add New Product
                 </Link>
               </Button>
             </div>
             {listings.length === 0 ? (
-              <Card className="border-orange-200 text-center p-12">
-                <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-600 mb-2">No listings yet</h3>
-                <Button asChild className="bg-gradient-to-r from-orange-500 to-red-500">
+              <Card className="border-border text-center p-12">
+                <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-muted-foreground mb-2">No listings yet</h3>
+                <Button asChild className="bg-madder">
                   <Link href="/artisan/create-listing">
                     <Plus className="w-4 h-4 mr-2" /> Create Your First Listing
                   </Link>
@@ -257,23 +246,19 @@ export default function ArtisanDashboard() {
                   <Card key={listing.id || `listing-${index}`} className="hover:shadow-lg">
                     <div className="aspect-square relative overflow-hidden rounded-t-lg">
                       {listing.images?.[0] ? (
-                        <img
-                          src={listing.images[0] || "/placeholder.svg"}
-                          alt={listing.title}
-                          className="w-full h-full object-cover"
-                        />
+                        <ProductImage src={listing.images[0] || "/placeholder.svg"} alt={listing.title} sizes="(min-width: 768px) 20rem, 92vw" />
                       ) : (
-                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                          <Package className="w-12 h-12 text-gray-400" />
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <Package className="w-12 h-12 text-muted-foreground" />
                         </div>
                       )}
-                      <Badge className="absolute top-2 right-2 bg-green-500">Published</Badge>
+                      <Badge className="absolute top-2 right-2 bg-neem">Published</Badge>
                     </div>
                     <CardContent className="p-4">
-                      <h3 className="font-semibold text-gray-800 mb-2 line-clamp-2">{listing.title}</h3>
-                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">{listing.description}</p>
+                      <h3 className="font-semibold text-foreground mb-2 line-clamp-2">{listing.title}</h3>
+                      <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{listing.description}</p>
                       <div className="flex justify-between mb-4">
-                        <span className="text-lg font-bold text-orange-600">{listing.suggestedPrice}</span>
+                        <span className="text-lg font-bold text-madder">{listing.suggestedPrice}</span>
                         <Badge variant="outline">{listing.category}</Badge>
                       </div>
                       <div className="flex gap-2">
@@ -292,11 +277,11 @@ export default function ArtisanDashboard() {
           </TabsContent>
 
           <TabsContent value="orders" className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800">Recent Orders</h2>
+            <h2 className="text-2xl font-bold text-foreground">Recent Orders</h2>
             {orders.length === 0 ? (
               <Card className="p-12 text-center">
-                <ShoppingCart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-600 mb-2">No orders yet</h3>
+                <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-muted-foreground mb-2">No orders yet</h3>
               </Card>
             ) : (
               <div className="space-y-4">
@@ -304,14 +289,12 @@ export default function ArtisanDashboard() {
                   <Card key={order.id}>
                     <CardContent className="p-6 flex justify-between items-center">
                       <div className="flex items-start gap-4">
-                        <img
-                          src={order.productImage || "/placeholder.svg"}
-                          alt={order.productTitle}
-                          className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                        />
+                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border">
+                          <ProductImage src={order.productImage} alt={order.productTitle} sizes="5rem" />
+                        </div>
                         <div>
-                          <h3 className="font-semibold text-gray-800">{order.productTitle}</h3>
-                          <p className="text-gray-600 text-sm">
+                          <h3 className="font-semibold text-foreground">{order.productTitle}</h3>
+                          <p className="text-muted-foreground text-sm">
                             Ordered by {order.buyer} • Quantity: {order.quantity}
                           </p>
                         </div>
@@ -319,7 +302,7 @@ export default function ArtisanDashboard() {
                       <div className="text-right">
                         <p className="text-lg font-bold">{order.amount}</p>
                         <div
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${orderStatusClass(order.status)}`}
                         >
                           {getStatusIcon(order.status)}
                           {order.status}

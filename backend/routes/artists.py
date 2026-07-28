@@ -1,105 +1,97 @@
+import asyncio
+import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, status
 from firebase_admin import auth
-from typing import List, Optional, Dict, Any
-from .auth import get_current_user, check_artist_role
-from models.artistModel import ArtistProfile, ArtistProfileUpdate, ArtisanOnboardingData, ArtisanProfileDB, ArtisanProfileResponse
-from models.listingModel import Listing, ListingsResponse # Ensure Listing and ListingsResponse are imported
+
+from models.artistModel import (
+    ArtisanOnboardingData,
+    ArtisanProfileDB,
+    ArtisanProfileResponse,
+    ArtistProfile,
+    ArtistProfileUpdate,
+)
+from models.listingModel import Listing, ListingsResponse
 from services.database import Database
-from datetime import datetime # CRUCIAL: Import datetime
-from bson import ObjectId # CRUCIAL: Import ObjectId for explicit conversion
 from utils.image_helpers import construct_image_urls, get_first_image_url
-import os
+from utils.serialization import serialize_listing_doc
+
+from .auth import check_artist_role, get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-def serialize_artisan_doc(artisan_doc: dict) -> dict:
+MAX_ARTIST_LISTINGS = 200
+MAX_ARTIST_ORDERS = 200
+
+
+def serialize_artisan_doc(artisan_doc: dict) -> Optional[dict]:
     """Helper function to serialize MongoDB document for Pydantic models"""
-    if artisan_doc:
-        # Convert ObjectId to string
-        if "_id" in artisan_doc:
-            artisan_doc["_id"] = str(artisan_doc["_id"])
-        
-        # Ensure required fields for ArtisanProfileResponse are present
-        # Assuming ArtisanProfileResponse expects 'name', 'email', 'display_name'
-        # and that 'name' is the primary name field, 'display_name' is optional.
-        # The error specifically mentions 'display_name' and 'email' as missing.
-        artisan_doc["name"] = artisan_doc.get("name", artisan_doc.get("display_name", "Unknown Artisan"))
-        artisan_doc["display_name"] = artisan_doc.get("display_name", artisan_doc.get("name", "Unknown Artisan")) # Ensure display_name is present
-        artisan_doc["email"] = artisan_doc.get("email", "unknown@example.com") # Ensure email is present
-        
-        return artisan_doc
+    if not artisan_doc:
+        return None
+    if "_id" in artisan_doc:
+        artisan_doc["_id"] = str(artisan_doc["_id"])
+    artisan_doc["name"] = artisan_doc.get("name") or artisan_doc.get("display_name") or "Unknown Artisan"
+    artisan_doc["display_name"] = artisan_doc.get("display_name") or artisan_doc["name"]
+    artisan_doc["email"] = artisan_doc.get("email", "unknown@example.com")
+    return artisan_doc
+
+
+def _first_image_id(listing: Optional[dict]) -> Optional[str]:
+    ids = (listing or {}).get("image_ids") or []
+    if not ids:
+        return None
+    item = ids[0]
+    if isinstance(item, dict) and "$oid" in item:
+        return item["$oid"]
+    if isinstance(item, ObjectId):
+        return str(item)
+    if isinstance(item, str):
+        return item
     return None
 
-def serialize_listing_doc(listing_doc: dict) -> dict:
-    """Helper function to serialize MongoDB listing document for Pydantic models"""
-    # Create a copy to avoid modifying the original document during serialization
-    serialized_doc = listing_doc.copy()
-    # CRUCIAL: Handle _id to 'id' mapping for Pydantic model
-    if "_id" in serialized_doc and isinstance(serialized_doc["_id"], ObjectId):
-        serialized_doc["id"] = str(serialized_doc["_id"]) # Map _id to 'id'
-        del serialized_doc["_id"] # Remove _id as Pydantic model uses 'id'
-    elif "_id" in serialized_doc: # If _id is already a string (e.g., from a previous serialization)
-        serialized_doc["id"] = str(serialized_doc["_id"])
-        del serialized_doc["_id"]
-    else:
-        # This case should ideally not happen for documents fetched from MongoDB
-        serialized_doc["id"] = "missing_id_fallback" # Fallback for debugging
-        print(f"DEBUG_ARTIST_LISTINGS: WARNING: Listing document missing _id. Using fallback.")
-    # Ensure image_ids is a list of strings
-    if "image_ids" in serialized_doc and isinstance(serialized_doc["image_ids"], list):
-        serialized_doc["image_ids"] = [str(img_id) if isinstance(img_id, ObjectId) else str(img_id) for img_id in serialized_doc["image_ids"]]
-    else:
-        serialized_doc["image_ids"] = [] # Default to empty list if not present or not a list
-    # Ensure all other fields expected by Pydantic model are present with defaults
-    # This is crucial if the DB document is missing some fields after AI enrichment or initial creation
-    serialized_doc["tags"] = serialized_doc.get("tags", [])
-    serialized_doc["story"] = serialized_doc.get("story", "")
-    serialized_doc["created_at"] = serialized_doc.get("created_at", datetime.utcnow())
-    serialized_doc["updated_at"] = serialized_doc.get("updated_at", datetime.utcnow())
-    serialized_doc["status"] = serialized_doc.get("status", "active")
-    serialized_doc["ai_generated"] = serialized_doc.get("ai_generated", False)
-    serialized_doc["ai_metadata"] = serialized_doc.get("ai_metadata", {})
-    # Ensure price is float, handle potential string prices from old data/AI
-    try:
-        price_val = serialized_doc.get("price", serialized_doc.get("suggested_price", "0.0"))
-        if isinstance(price_val, str):
-            price_val = float(price_val.replace('₹', ''))
-        serialized_doc["price"] = float(price_val)
-    except (ValueError, TypeError):
-        serialized_doc["price"] = 0.0
-        print(f"DEBUG_ARTIST_LISTINGS: WARNING: Could not parse price for listing {serialized_doc.get('id')}. Setting to 0.0.")
-    try:
-        original_price_val = serialized_doc.get("originalPrice", serialized_doc.get("price", "0.0"))
-        if isinstance(original_price_val, str):
-            original_price_val = float(original_price_val.replace('₹', ''))
-        serialized_doc["originalPrice"] = float(original_price_val)
-    except (ValueError, TypeError):
-        serialized_doc["originalPrice"] = serialized_doc["price"] # Fallback to parsed price
-        print(f"DEBUG_ARTIST_LISTINGS: WARNING: Could not parse originalPrice for listing {serialized_doc.get('id')}. Setting to price.")
-    serialized_doc["inStock"] = serialized_doc.get("inStock", True)
-    serialized_doc["stockCount"] = serialized_doc.get("stockCount", 0)
-    serialized_doc["features"] = serialized_doc.get("features", [])
-    serialized_doc["specifications"] = serialized_doc.get("specifications", {})
-    serialized_doc["reviews"] = serialized_doc.get("reviews", [])
-    serialized_doc["shippingInfo"] = serialized_doc.get("shippingInfo", {})
-    # Ensure artist_id is handled properly
-    if "artist_id" in serialized_doc and serialized_doc["artist_id"] is None:
-        serialized_doc["artist_id"] = None  # Keep as None, now allowed by the model
-    return serialized_doc
+
+def _product_image(listing: Optional[dict]) -> str:
+    image_id = _first_image_id(listing)
+    if listing and image_id:
+        return get_first_image_url(str(listing["_id"]), [image_id])
+    return "/placeholder.svg"
+
+
+async def _listings_by_id(db, raw_ids) -> Dict[str, dict]:
+    """One `$in` query for all the listings referenced by a batch of orders."""
+    object_ids = []
+    for value in raw_ids:
+        if not value:
+            continue
+        try:
+            object_ids.append(ObjectId(str(value)))
+        except (InvalidId, TypeError):
+            continue
+    if not object_ids:
+        return {}
+    cursor = db["listings"].find(
+        {"_id": {"$in": object_ids}}, {"title": 1, "image_ids": 1}
+    )
+    return {str(doc["_id"]): doc async for doc in cursor}
+
 
 @router.post("/artist/onboarding", response_model=ArtisanProfileResponse)
 async def complete_artisan_onboarding(
     onboarding_data: ArtisanOnboardingData,
-    current_user: dict = Depends(get_current_user)):
-    print(onboarding_data)
+    current_user: dict = Depends(get_current_user),
+):
+    if current_user.get("role") != "artisan":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only artisans can complete onboarding",
+        )
     try:
-        # Check if user role is artisan
-        if current_user.get("role") != "artisan":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only artisans can complete onboarding"
-            )
-        # Create artisan profile in MongoDB
         artisan_profile = ArtisanProfileDB(
             firebase_uid=current_user["firebase_uid"],
             name=onboarding_data.name,
@@ -108,307 +100,266 @@ async def complete_artisan_onboarding(
             state=onboarding_data.state,
             language=onboarding_data.language,
             experience=onboarding_data.experience,
-            bio=onboarding_data.bio
+            bio=onboarding_data.bio,
         )
         db = Database.get_db()
-        existing_profile = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
+        existing_profile = await db["users"].find_one(
+            {"firebase_uid": current_user["firebase_uid"]}, {"_id": 1}
+        )
         if existing_profile:
             await db["users"].update_one(
                 {"firebase_uid": current_user["firebase_uid"]},
                 {
                     "$set": {
-                        **artisan_profile.model_dump(by_alias=True, exclude={"id", "created_at"}),
-                        "is_onboarded": True
+                        **artisan_profile.model_dump(
+                            by_alias=True, exclude={"id", "created_at"}
+                        ),
+                        "is_onboarded": True,
                     }
-                }
+                },
             )
-            updated_profile = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
-            serialized_profile = serialize_artisan_doc(updated_profile)
-            return ArtisanProfileResponse(**serialized_profile)
+            profile = await db["users"].find_one(
+                {"firebase_uid": current_user["firebase_uid"]}
+            )
         else:
             result = await db["users"].insert_one(
-                {
-                    **artisan_profile.model_dump(by_alias=True),
-                    "is_onboarded": True
-                }
+                {**artisan_profile.model_dump(by_alias=True), "is_onboarded": True}
             )
-            created_profile = await db["users"].find_one({"_id": result.inserted_id})
-            serialized_profile = serialize_artisan_doc(created_profile)
-            return ArtisanProfileResponse(**serialized_profile)
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
+            profile = await db["users"].find_one({"_id": result.inserted_id})
+        return ArtisanProfileResponse(**serialize_artisan_doc(profile))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to save artisan profile")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save artisan profile"
+            detail="Failed to save artisan profile",
         )
 
-@router.get("/artist/me", response_model=ArtisanProfileResponse) # Use the more detailed response model
+
+@router.get("/artist/me", response_model=ArtisanProfileResponse)
 async def get_artist_profile(current_user: dict = Depends(check_artist_role)):
-    try:
-        db = Database.get_db()
-        # Fetch the artisan's profile from your MongoDB collection
-        artisan_profile_doc = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
-        if not artisan_profile_doc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Artisan profile not found in database. Please complete onboarding."
-            )
-        # Serialize the document to make it compatible with the Pydantic model
-        serialized_profile = serialize_artisan_doc(artisan_profile_doc)
-        return ArtisanProfileResponse(**serialized_profile)
-    except auth.UserNotFoundError:
-        # This case might be redundant if check_artist_role already handles it
+    db = Database.get_db()
+    artisan_profile_doc = await db["users"].find_one(
+        {"firebase_uid": current_user["firebase_uid"]}
+    )
+    if not artisan_profile_doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Artist not found in Firebase."
+            detail="Artisan profile not found in database. Please complete onboarding.",
         )
-    except Exception as e:
-        # General error handler
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred: {str(e)}"
-        )
+    return ArtisanProfileResponse(**serialize_artisan_doc(artisan_profile_doc))
+
 
 @router.put("/artist/me", response_model=ArtistProfile)
 async def update_artist_profile(
     profile_update: ArtistProfileUpdate,
-    current_user: dict = Depends(check_artist_role)):
+    current_user: dict = Depends(check_artist_role),
+):
+    """Was a guaranteed KeyError: it read current_user["uid"], but
+    get_current_user returns the Mongo document, which is keyed firebase_uid."""
+    firebase_uid = current_user["firebase_uid"]
+
+    update_kwargs = {}
+    if profile_update.display_name:
+        update_kwargs["display_name"] = profile_update.display_name
+    if profile_update.phone_number:
+        update_kwargs["phone_number"] = profile_update.phone_number
+
     try:
-        # Update artist in Firebase
-        update_kwargs = {}
-        if profile_update.display_name:
-            update_kwargs["display_name"] = profile_update.display_name
-        if profile_update.phone_number:
-            update_kwargs["phone_number"] = profile_update.phone_number
-        user = auth.update_user(
-            current_user["uid"],
-            **update_kwargs
-        )
-        return ArtistProfile(
-            display_name=user.display_name,
-            email=user.email,
-            phone_number=user.phone_number,
-            bio=profile_update.bio,
-            specialization=profile_update.specialization,
-            portfolio_url=profile_update.portfolio_url,
-            years_of_experience=profile_update.years_of_experience
-        )
+        if update_kwargs:
+            user = await asyncio.to_thread(auth.update_user, firebase_uid, **update_kwargs)
+        else:
+            user = await asyncio.to_thread(auth.get_user, firebase_uid)
     except auth.UserNotFoundError:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Artist not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artist not found"
         )
+    except Exception:
+        logger.exception("Firebase update failed for %s", firebase_uid)
+        raise HTTPException(status_code=502, detail="Identity provider error")
+
+    # Mirror the editable fields into Mongo so /api/me stays consistent.
+    mongo_update = {"updated_at": datetime.utcnow()}
+    for field in (
+        "display_name",
+        "phone_number",
+        "bio",
+        "specialization",
+        "portfolio_url",
+        "years_of_experience",
+    ):
+        value = getattr(profile_update, field, None)
+        if value is not None:
+            mongo_update[field] = value
+    await Database.get_db()["users"].update_one(
+        {"firebase_uid": firebase_uid}, {"$set": mongo_update}
+    )
+
+    return ArtistProfile(
+        display_name=user.display_name or "",
+        email=user.email or "",
+        phone_number=user.phone_number,
+        bio=profile_update.bio,
+        specialization=profile_update.specialization,
+        portfolio_url=profile_update.portfolio_url,
+        years_of_experience=profile_update.years_of_experience,
+    )
+
 
 @router.get("/artist/listings", response_model=ListingsResponse)
 async def get_artist_listings(current_user: dict = Depends(check_artist_role)):
-    try:
-        db = Database.get_db()
-        artisan_profile_doc = await db["users"].find_one({"firebase_uid": current_user["firebase_uid"]})
-        if not artisan_profile_doc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Artisan profile not found in database."
+    db = Database.get_db()
+    firebase_uid = current_user["firebase_uid"]
+
+    listings = (
+        await db["listings"]
+        .find({"artist_id": firebase_uid})
+        .sort("created_at", -1)
+        .to_list(length=MAX_ARTIST_LISTINGS)  # was .to_list(None)
+    )
+
+    serialized_listings = []
+    skipped = 0
+    for listing_doc in listings:
+        doc = serialize_listing_doc(listing_doc)
+        image_ids = doc.get("image_ids", [])
+        doc["images"] = (
+            construct_image_urls(doc["id"], image_ids) if image_ids else ["/placeholder.svg"]
+        )
+        try:
+            serialized_listings.append(Listing(**doc))
+        except Exception:
+            skipped += 1
+            logger.warning(
+                "Skipping artist listing %s: fails Listing validation",
+                doc.get("id"),
+                exc_info=True,
             )
-                # Fetch listings
-        listings_cursor = db["listings"].find({"artist_id": artisan_profile_doc["firebase_uid"]})
-        listings = await listings_cursor.to_list(None) # Fetch all listings
-        # Calculate total count for pagination
-        total_count = await db["listings"].count_documents({"artist_id": artisan_profile_doc["firebase_uid"]})
-        # Serialize each listing and validate with Pydantic model
-        serialized_listings = []
-        for listing_doc in listings:
-            serialized_doc = serialize_listing_doc(listing_doc)
-            # --- CRITICAL CHANGE FOR LISTINGS IMAGES ---
-            # Construct full image URLs for the 'images' array using helper function
-            listing_id_str = serialized_doc.get("id") # 'id' is already a string from serialize_listing_doc
-            image_ids = serialized_doc.get("image_ids", [])
-            
-            if listing_id_str and image_ids:
-                full_image_urls = construct_image_urls(listing_id_str, image_ids)
-            else:
-                full_image_urls = ["/placeholder.svg"]
-            
-            serialized_doc["images"] = full_image_urls # Assign the constructed URLs to the 'images' field
-            try:
-                pydantic_listing = Listing(**serialized_doc)
-                serialized_listings.append(pydantic_listing)
-            except Exception as e:
-                print(f"DEBUG_ARTIST_LISTINGS: Pydantic validation error for listing: {e} on doc: {serialized_doc}")
-                continue # Skip problematic listing
-        return ListingsResponse(
-            listings=serialized_listings,
-            total=total_count,
-            limit=len(serialized_listings), # Use actual number of listings returned
-            skip=0 # Assuming no skip parameter for this endpoint yet
-        )
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch listings: {str(e)}"
-        )
+    if skipped:
+        logger.error("%s of this artisan's listings failed validation", skipped)
+
+    return ListingsResponse(
+        listings=serialized_listings,
+        # count_documents used to re-run a filter already answered by len().
+        total=len(listings),
+        limit=MAX_ARTIST_LISTINGS,
+        skip=0,
+    )
+
 
 @router.get("/artist/orders", response_model=List[Dict[str, Any]])
 async def get_artist_orders(current_user: dict = Depends(check_artist_role)):
     """Fetch orders for the logged-in artisan."""
-    print(f"DEBUG_ORDERS: get_artist_orders invoked for user: {current_user.get('firebase_uid')}")
-    try:
-        db = Database.get_db()
-        artisan_firebase_uid = current_user["firebase_uid"]
-        print(f"DEBUG_ORDERS: Artisan Firebase UID: {artisan_firebase_uid}")
-        
-        # Method 1: Get orders from artist_orders collection (new method)
-        artist_orders_cursor = db["artist_orders"].find({"artist_id": artisan_firebase_uid}).sort("order_date", -1)
-        artist_orders = await artist_orders_cursor.to_list(None)
-        print(f"DEBUG_ORDERS: Artist orders from artist_orders collection: {len(artist_orders)}")
-        
-        # Method 2: Find listings created by this artisan to get their listing IDs (existing method)
-        artisan_listings_cursor = db["listings"].find({"artist_id": artisan_firebase_uid}, {"_id": 1})
-        artisan_listing_ids = [str(listing["_id"]) for listing in await artisan_listings_cursor.to_list(None)]
-        print(f"DEBUG_ORDERS: Artisan's listing IDs found: {artisan_listing_ids}")
-        
-        # Find orders where the product_id is one of the artisan's listing IDs
-        orders = []
-        if artisan_listing_ids:
-            orders_cursor = db["orders"].find({"product_id": {"$in": artisan_listing_ids}}).sort("order_date", -1)
-            print(f"DEBUG_ORDERS: Querying orders with product_id in: {artisan_listing_ids}")
-            orders = await orders_cursor.to_list(None)
-            print(f"DEBUG_ORDERS: Raw orders fetched from DB: {orders}")
-        
-        # Combine and deduplicate orders from both sources
-        all_orders = []
-        processed_order_ids = set()
-        
-        # Process artist_orders first (new method)
-        for artist_order in artist_orders:
-            order_id = str(artist_order.get("order_id", artist_order.get("_id", "")))
-            if order_id not in processed_order_ids:
-                processed_order_ids.add(order_id)
-                
-                # Get product image from listings
-                product_image_url = "/placeholder.svg"
-                product_listing = await db["listings"].find_one({"_id": ObjectId(artist_order.get("product_id", ""))})
-                if product_listing and product_listing.get("image_ids"):
-                    first_image_id_item = product_listing["image_ids"][0]
-                    if isinstance(first_image_id_item, dict) and "$oid" in first_image_id_item:
-                        first_image_id_str = first_image_id_item["$oid"]
-                    elif isinstance(first_image_id_item, ObjectId):
-                        first_image_id_str = str(first_image_id_item)
-                    elif isinstance(first_image_id_item, str):
-                        first_image_id_str = first_image_id_item
-                    else:
-                        first_image_id_str = None
-                    
-                    if first_image_id_str:
-                        listing_id_str = str(product_listing["_id"])
-                        product_image_url = get_first_image_url(listing_id_str, [first_image_id_str])
-                
-                all_orders.append({
-                    "id": order_id,
-                    "productTitle": artist_order.get("product_title", "Unknown Product"),
-                    "productImage": product_image_url,
-                    "buyer": artist_order.get("buyer_name", "Unknown Buyer"),
-                    "amount": f"₹{artist_order.get('total_amount', 0):.2f}",
-                    "status": artist_order.get("status", "pending"),
-                    "date": artist_order.get("order_date", datetime.utcnow()).isoformat(),
-                    "quantity": artist_order.get("quantity", 1),
-                    "shippingAddress": artist_order.get("shipping_address", "N/A"),
-                    "paymentMethod": artist_order.get("payment_method", "N/A"),
-                    "trackingNumber": artist_order.get("tracking_number", None),
-                    "estimatedDelivery": artist_order.get("estimated_delivery", "N/A"),
-                    "deliveredDate": artist_order.get("delivered_date", None),
-                })
-        
-        # Process existing orders (fallback for orders created before this feature)
-        for order_doc in orders:
-            order_id = str(order_doc["_id"])
-            if order_id not in processed_order_ids:
-                processed_order_ids.add(order_id)
-                print(f"DEBUG_ORDERS: Processing order_doc: {order_doc.get('_id')}, product_id: {order_doc.get('product_id')}")
-                
-                # Fetch product details (especially image_ids) from the listings collection
-                product_listing = await db["listings"].find_one({"_id": ObjectId(order_doc["product_id"])})
-                print(f"DEBUG_ORDERS: Fetched product listing for order: {product_listing.get('title') if product_listing else 'None'}")
-                product_image_url = "/placeholder.svg"
-                if product_listing and product_listing.get("image_ids"):
-                    # Extract the string ID from the {"$oid": "..."} dictionary
-                    first_image_id_item = product_listing["image_ids"][0]
-                    if isinstance(first_image_id_item, dict) and "$oid" in first_image_id_item:
-                        first_image_id_str = first_image_id_item["$oid"]
-                    elif isinstance(first_image_id_item, ObjectId):
-                        first_image_id_str = str(first_image_id_item)
-                    elif isinstance(first_image_id_item, str):
-                        first_image_id_str = first_image_id_item
-                    else:
-                        first_image_id_str = None # Fallback if unexpected type
-                    if first_image_id_str:
-                        listing_id_str = str(product_listing["_id"])
-                        product_image_url = get_first_image_url(listing_id_str, [first_image_id_str])
-                        print(f"DEBUG_ORDERS: Constructed image URL: {product_image_url}")
-                    else:
-                        print("DEBUG_ORDERS: No valid image ID extracted from product_listing['image_ids'][0]. Using placeholder.")
-                else:
-                    print("DEBUG_ORDERS: Product listing or image_ids missing. Using placeholder.")
-                
-                all_orders.append({
-                    "id": order_id,
-                    "productTitle": product_listing.get("title", "Unknown Product") if product_listing else "Unknown Product",
-                    "productImage": product_image_url,
-                    "buyer": order_doc.get("buyer_name", "Unknown Buyer"),
-                    "amount": f"₹{order_doc.get('total_amount', 0):.2f}",
-                    "status": order_doc.get("status", "pending"),
-                    "date": order_doc.get("order_date", datetime.utcnow()).isoformat(),
-                    "quantity": order_doc.get("quantity", 1),
-                    "shippingAddress": order_doc.get("shipping_address", "N/A"),
-                    "paymentMethod": order_doc.get("payment_method", "N/A"),
-                    "trackingNumber": order_doc.get("tracking_number", None),
-                    "estimatedDelivery": order_doc.get("estimated_delivery", "N/A"),
-                    "deliveredDate": order_doc.get("delivered_date", None),
-                })
-        
-        print(f"DEBUG_ORDERS: Final combined orders count: {len(all_orders)}")
-        return all_orders
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch artisan orders: {str(e)}"
+    db = Database.get_db()
+    artisan_firebase_uid = current_user["firebase_uid"]
+
+    artist_orders = (
+        await db["artist_orders"]
+        .find({"artist_id": artisan_firebase_uid})
+        .sort("order_date", -1)
+        .to_list(length=MAX_ARTIST_ORDERS)
+    )
+
+    artisan_listing_ids = [
+        str(doc["_id"])
+        async for doc in db["listings"].find({"artist_id": artisan_firebase_uid}, {"_id": 1})
+    ]
+
+    orders = []
+    if artisan_listing_ids:
+        orders = (
+            await db["orders"]
+            .find({"product_id": {"$in": artisan_listing_ids}})
+            .sort("order_date", -1)
+            .to_list(length=MAX_ARTIST_ORDERS)
         )
+
+    # One batched listings lookup for BOTH sources instead of one find_one per
+    # order row inside two separate loops.
+    listings_by_id = await _listings_by_id(
+        db,
+        [o.get("product_id") for o in artist_orders] + [o.get("product_id") for o in orders],
+    )
+
+    all_orders = []
+    processed_order_ids = set()
+
+    for artist_order in artist_orders:
+        order_id = str(artist_order.get("order_id") or artist_order.get("_id", ""))
+        if order_id in processed_order_ids:
+            continue
+        processed_order_ids.add(order_id)
+        listing = listings_by_id.get(str(artist_order.get("product_id", "")))
+        all_orders.append(
+            _order_row(order_id, artist_order, _product_image(listing), artist_order.get("product_title"))
+        )
+
+    for order_doc in orders:
+        order_id = str(order_doc["_id"])
+        if order_id in processed_order_ids:
+            continue
+        processed_order_ids.add(order_id)
+        listing = listings_by_id.get(str(order_doc.get("product_id", "")))
+        title = (listing or {}).get("title") or order_doc.get("product_title")
+        all_orders.append(_order_row(order_id, order_doc, _product_image(listing), title))
+
+    return all_orders
+
+
+def _order_row(order_id: str, doc: dict, image_url: str, title: Optional[str]) -> dict:
+    def _iso(value):
+        return value.isoformat() if isinstance(value, datetime) else value
+
+    return {
+        "id": order_id,
+        "productTitle": title or "Unknown Product",
+        "productImage": image_url,
+        "buyer": doc.get("buyer_name", "Unknown Buyer"),
+        "amount": f"₹{doc.get('total_amount', 0):.2f}",
+        "status": doc.get("status", "pending"),
+        "date": _iso(doc.get("order_date", datetime.utcnow())),
+        "quantity": doc.get("quantity", 1),
+        "shippingAddress": doc.get("shipping_address", "N/A"),
+        "paymentMethod": doc.get("payment_method", "N/A"),
+        "trackingNumber": doc.get("tracking_number"),
+        "estimatedDelivery": _iso(doc.get("estimated_delivery")) or "N/A",
+        "deliveredDate": _iso(doc.get("delivered_date")),
+    }
+
 
 @router.get("/public/{artist_id}", response_model=ArtisanProfileResponse)
 async def get_public_artist_profile(artist_id: str):
+    db = Database.get_db()
+    artisan_profile_doc = await db["users"].find_one({"firebase_uid": artist_id})
+    if artisan_profile_doc:
+        return ArtisanProfileResponse(**serialize_artisan_doc(artisan_profile_doc))
+
+    # Fallback to Firebase. The old code called auth.get_user_claims(), which
+    # does not exist in firebase_admin.auth (AttributeError -> 500 every time),
+    # and then built an ArtisanProfileResponse without the required _id.
     try:
-        db = Database.get_db()
-        # Fetch from MongoDB first
-        artisan_profile_doc = await db["users"].find_one({"firebase_uid": artist_id})
-        if artisan_profile_doc:
-            serialized_profile = serialize_artisan_doc(artisan_profile_doc)
-            return ArtisanProfileResponse(**serialized_profile)
-        # If not found in DB, optionally skip Firebase check, or leave as fallback:
-        try:
-            user = auth.get_user(artist_id)
-            claims = auth.get_user_claims(artist_id)
-            if claims.get("role") != "artisan": # Adjusted to match MongoDB role convention
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Artist not found"
-                )
-            return ArtisanProfileResponse(
-                firebase_uid=user.uid,
-                name=user.display_name,
-                state="",
-                craft=None
-            )
-        except auth.UserNotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Artist not found in Firebase."
-            )
-    except Exception as e:
+        user = await asyncio.to_thread(auth.get_user, artist_id)
+    except auth.UserNotFoundError:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching public artist profile: {str(e)}"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artist not found"
         )
+    except Exception:
+        logger.exception("Firebase lookup failed for %s", artist_id)
+        raise HTTPException(status_code=502, detail="Identity provider error")
+
+    # Custom claims live on the UserRecord itself.
+    if (user.custom_claims or {}).get("role") != "artisan":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Artist not found"
+        )
+
+    return ArtisanProfileResponse(
+        **{
+            "_id": user.uid,
+            "firebase_uid": user.uid,
+            "name": user.display_name,
+            "state": None,
+            "craft": None,
+        }
+    )

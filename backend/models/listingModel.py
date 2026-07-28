@@ -6,20 +6,31 @@ from bson import ObjectId
 
 # New Pydantic models for Reviews
 class ReviewCreate(BaseModel):
-    """Model for incoming review data from the frontend."""
-    rating: int = Field(..., ge=1, le=5, description="Star rating from 1 to 5")
-    comment: str = Field(..., min_length=1, description="Review comment, at least 1 character") # CHANGED: min_length from 10 to 1
-    userId: str = Field(..., description="Firebase UID of the user submitting the review")
-    userName: str = Field(..., description="Display name of the user submitting the review")
-    userEmail: Optional[str] = Field(None, description="Email of the user submitting the review (optional)")
+    """Incoming review data (frozen API contract #3).
 
-class Review(ReviewCreate):
+    userId / userName are deliberately NOT accepted from the client - they used
+    to be required body fields, which let anyone post a review under any other
+    user's name. The server fills them in from the bearer token.
+    """
+    rating: int = Field(..., ge=1, le=5, description="Star rating from 1 to 5")
+    comment: str = Field(..., min_length=1, max_length=5000, description="Review comment")
+
+    class Config:
+        extra = "ignore"  # tolerate old clients still sending userId/userName
+
+class Review(BaseModel):
     """Model for a review as stored in the database."""
-    # Use default_factory for id to generate a new ObjectId string if not provided
     id: str = Field(default_factory=lambda: str(ObjectId()), description="Unique ID for the review (MongoDB ObjectId)")
+    rating: int = Field(..., ge=1, le=5)
+    comment: str
+    # Server-populated identity, taken from the authenticated user.
+    userId: str
+    userName: str
+    userEmail: Optional[str] = None
     # Format date as "Month Day, Year" for consistency with frontend display
     date: str = Field(default_factory=lambda: datetime.utcnow().strftime("%B %d, %Y"), description="Formatted date of the review")
-    verified: bool = Field(True, description="Indicates if the review is verified (e.g., from a real purchase)")
+    # Computed from order history, not hardcoded.
+    verified: bool = False
 
 class Listing(BaseModel):
     # CRUCIAL CHANGE: Use 'id' as the primary identifier in Pydantic, aliasing MongoDB's '_id'
@@ -50,6 +61,13 @@ class Listing(BaseModel):
     # CRUCIAL CHANGE: Update reviews field to use the new Review Pydantic model
     reviews: List[Review] = [] # Changed from Optional[List[Dict[str, Any]]]
     shippingInfo: Optional[Dict[str, str]] = {}
+    # Frozen API contract #1: embedded artisan block so the marketplace does not
+    # have to fetch one artist per card.
+    artisan: Optional[Dict[str, Any]] = None
+    # Review aggregates, so the list endpoint never has to ship whole review
+    # arrays. `rating` is None when a listing has no reviews yet.
+    review_count: Optional[int] = None
+    rating: Optional[float] = None
 
     class Config:
         populate_by_name = True # Allows Pydantic to map by field name or alias (e.g., _id to id)
@@ -73,18 +91,5 @@ class ListingsResponse(BaseModel):
             datetime: lambda dt: dt.isoformat(),
             ObjectId: str  # Convert ObjectId to string for JSON serialization
         }
-
-class Order(BaseModel):
-    id: str
-    productTitle: str
-    productImage: str
-    buyer: str
-    amount: str
-    status: str
-    date: str
-    quantity: int
-    shippingAddress: Optional[str] = None
-    paymentMethod: Optional[str] = None
-    trackingNumber: Optional[str] = None
-    estimatedDelivery: Optional[str] = None
-    deliveredDate: Optional[str] = None
+# NOTE: the duplicate `Order` model that used to live here was removed.
+# The single definition is models/orderModel.py.

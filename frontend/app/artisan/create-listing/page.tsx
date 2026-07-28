@@ -184,7 +184,7 @@ const publishListing = async () => {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
         {/* Progress Steps */}
         <div className="max-w-4xl mx-auto mb-8">
@@ -193,17 +193,17 @@ const publishListing = async () => {
               <div key={step.number} className="flex items-center">
                 <div
                   className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                    currentStep > step.number
-                      ? "bg-green-500 border-green-500 text-white"
-                      : currentStep === step.number
-                        ? "bg-orange-500 border-orange-500 text-white"
-                        : "bg-white border-gray-300 text-gray-400"
-                  }`}
+ currentStep > step.number
+ ? "bg-neem border-border text-primary-foreground"
+ : currentStep === step.number
+ ? "bg-madder border-madder text-primary-foreground"
+ : "bg-card border-border text-muted-foreground"
+ }`}
                 >
                   {currentStep > step.number ? <Check className="w-5 h-5" /> : step.number}
                 </div>
                 {index < steps.length - 1 && (
-                  <div className={`w-16 h-1 mx-2 ${currentStep > step.number ? "bg-green-500" : "bg-gray-200"}`} />
+                  <div className={`w-16 h-1 mx-2 ${currentStep > step.number ? "bg-neem" : "bg-muted"}`} />
                 )}
               </div>
             ))}
@@ -211,8 +211,8 @@ const publishListing = async () => {
           <div className="flex justify-between text-sm">
             {steps.map((step) => (
               <div key={step.number} className="text-center">
-                <div className="font-medium text-gray-800">{step.title}</div>
-                <div className="text-gray-500">{step.description}</div>
+                <div className="font-medium text-foreground">{step.title}</div>
+                <div className="text-muted-foreground">{step.description}</div>
               </div>
             ))}
           </div>
@@ -221,9 +221,9 @@ const publishListing = async () => {
         <div className="max-w-3xl mx-auto">
           {/* Step 1: Voice Input */}
           {currentStep === 1 && (
-            <Card className="border-orange-200 shadow-lg">
+            <Card className="border-border shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-600">
+                <CardTitle className="flex items-center gap-2 text-madder">
                   <Mic className="w-5 h-5" />
                   Describe Your Product
                 </CardTitle>
@@ -237,25 +237,25 @@ const publishListing = async () => {
                 <div className="text-center">
                   <div
                     className={`w-32 h-32 rounded-full border-4 flex items-center justify-center mx-auto mb-4 transition-all ${
-                      isRecording
-                        ? "border-red-500 bg-red-50 animate-pulse"
-                        : "border-orange-300 bg-orange-50 hover:bg-orange-100"
-                    }`}
+ isRecording
+ ? "border-destructive bg-destructive/10 animate-pulse"
+ : "border-border bg-secondary hover:bg-accent"
+ }`}
                   >
                     <Button
                       size="lg"
                       variant="ghost"
                       className={`w-20 h-20 rounded-full ${
-                        isRecording
-                          ? "bg-red-500 hover:bg-red-600 text-white"
-                          : "bg-orange-500 hover:bg-orange-600 text-white"
-                      }`}
+ isRecording
+ ? "bg-destructive hover:bg-destructive text-primary-foreground"
+ : "bg-madder hover:bg-madder/90 text-primary-foreground"
+ }`}
                       onClick={isRecording ? stopRecording : startRecording}
                     >
                       {isRecording ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
                     </Button>
                   </div>
-                  <p className="text-gray-600">
+                  <p className="text-muted-foreground">
                     {isRecording ? "Recording... Click to stop" : "Click to start recording"}
                   </p>
                 </div>
@@ -265,14 +265,14 @@ const publishListing = async () => {
                   <div className="space-y-4">
                     <Label>Transcription</Label>
                     {isRecording ? (
-                      <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
-                        <RefreshCw className="w-4 h-4 animate-spin text-orange-500" />
-                        <span className="text-gray-600">Listening... Speak now!</span>
+                      <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
+                        <RefreshCw className="w-4 h-4 animate-spin text-madder" />
+                        <span className="text-muted-foreground">Listening... Speak now!</span>
                       </div>
                     ) : isTranscribing ? (
-                      <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
-                        <RefreshCw className="w-4 h-4 animate-spin text-orange-500" />
-                        <span className="text-gray-600">Transcribing your voice...</span>
+                      <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
+                        <RefreshCw className="w-4 h-4 animate-spin text-madder" />
+                        <span className="text-muted-foreground">Transcribing your voice...</span>
                       </div>
                     ) : null}
                     <div className="space-y-2">
@@ -296,7 +296,7 @@ const publishListing = async () => {
                   <div className="flex justify-end">
                     <Button
                       onClick={() => setCurrentStep(2)}
-                      className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                      className="bg-madder"
                     >
                       Next: Add Images
                       <ArrowRight className="w-4 h-4 ml-2" />
@@ -309,9 +309,9 @@ const publishListing = async () => {
 
           {/* Step 2: Image Upload */}
           {currentStep === 2 && (
-            <Card className="border-orange-200 shadow-lg">
+            <Card className="border-border shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-600">
+                <CardTitle className="flex items-center gap-2 text-madder">
                   <Camera className="w-5 h-5" />
                   Add Product Images
                 </CardTitle>
@@ -322,16 +322,16 @@ const publishListing = async () => {
               <CardContent className="space-y-6">
                 {/* Upload Area */}
                 <div
-                  className="border-2 border-dashed border-orange-300 rounded-lg p-8 text-center hover:border-orange-400 transition-colors cursor-pointer"
+                  className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-madder transition-colors cursor-pointer"
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="w-12 h-12 text-orange-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-700 mb-2">
+                  <Upload className="w-12 h-12 text-madder mx-auto mb-4" />
+                  <p className="text-lg font-medium text-muted-foreground mb-2">
                     Drag and drop images here, or click to browse
                   </p>
-                  <p className="text-sm text-gray-500">Supports JPG, PNG, WebP (Max 5 images)</p>
+                  <p className="text-sm text-muted-foreground">Supports JPG, PNG, WebP (Max 5 images)</p>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -349,6 +349,8 @@ const publishListing = async () => {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       {images.map((image, index) => (
                         <div key={index} className="relative group">
+                          {/* A plain <img>: this is a blob: URL for a file the
+                              user just picked, which next/image cannot optimise. */}
                           <img
                             src={URL.createObjectURL(image) || "/placeholder.svg"}
                             alt={`Product ${index + 1}`}
@@ -376,7 +378,7 @@ const publishListing = async () => {
                   {images.length > 0 && (
                     <Button
                       onClick={() => setCurrentStep(3)}
-                      className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                      className="bg-madder"
                     >
                       Next: Generate Listing
                       <ArrowRight className="w-4 h-4 ml-2" />
@@ -389,9 +391,9 @@ const publishListing = async () => {
 
           {/* Step 3: AI Generation */}
           {currentStep === 3 && (
-            <Card className="border-orange-200 shadow-lg">
+            <Card className="border-border shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-600">
+                <CardTitle className="flex items-center gap-2 text-madder">
                   <Sparkles className="w-5 h-5" />
                   AI-Generated Listing
                 </CardTitle>
@@ -405,7 +407,7 @@ const publishListing = async () => {
                     <Button
                       size="lg"
                       onClick={generateListing}
-                      className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                      className="bg-madder"
                     >
                       <Sparkles className="w-5 h-5 mr-2" />
                       Generate & Save Listing with AI
@@ -415,12 +417,12 @@ const publishListing = async () => {
 
                 {isGenerating && (
                   <div className="text-center py-8 space-y-4">
-                    <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                      <Sparkles className="w-8 h-8 text-white" />
+                    <div className="w-16 h-16 bg-madder rounded-full flex items-center justify-center mx-auto animate-pulse">
+                      <Sparkles className="w-8 h-8 text-primary-foreground" />
                     </div>
                     <div>
-                      <p className="text-lg font-medium text-gray-700 mb-2">AI is creating your listing...</p>
-                      <p className="text-sm text-gray-500">Analyzing description, processing images, and saving to database</p>
+                      <p className="text-lg font-medium text-muted-foreground mb-2">AI is creating your listing...</p>
+                      <p className="text-sm text-muted-foreground">Analyzing description, processing images, and saving to database</p>
                     </div>
                     <Progress value={66} className="w-64 mx-auto" />
                   </div>
@@ -429,9 +431,9 @@ const publishListing = async () => {
                 {aiListing && (
                   <div className="space-y-6">
                     {/* Generated Listing Preview */}
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="bg-card border border-border rounded-lg p-6">
                       <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Generated Listing</h3>
+                        <h3 className="text-lg font-semibold text-foreground">Generated Listing</h3>
                         <Button variant="outline" size="sm" onClick={() => setEditMode(!editMode)}>
                           <Edit className="w-4 h-4 mr-1" />
                           {editMode ? "Save" : "Edit"}
@@ -447,7 +449,7 @@ const publishListing = async () => {
                               onChange={(e) => setAiListing({ ...aiListing, title: e.target.value })}
                             />
                           ) : (
-                            <p className="text-gray-800 font-medium">{aiListing.title}</p>
+                            <p className="text-foreground font-medium">{aiListing.title}</p>
                           )}
                         </div>
 
@@ -460,7 +462,7 @@ const publishListing = async () => {
                               rows={4}
                             />
                           ) : (
-                            <p className="text-gray-600">{aiListing.description}</p>
+                            <p className="text-muted-foreground">{aiListing.description}</p>
                           )}
                         </div>
 
@@ -478,7 +480,7 @@ const publishListing = async () => {
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <Label>Category</Label>
-                            <p className="text-gray-800">{aiListing.category}</p>
+                            <p className="text-foreground">{aiListing.category}</p>
                           </div>
                           <div>
                             <Label>Suggested Price</Label>
@@ -488,14 +490,14 @@ const publishListing = async () => {
                                 onChange={(e) => setAiListing({ ...aiListing, suggestedPrice: e.target.value })}
                               />
                             ) : (
-                              <p className="text-gray-800 font-medium">{aiListing.suggestedPrice}</p>
+                              <p className="text-foreground font-medium">{aiListing.suggestedPrice}</p>
                             )}
                           </div>
                         </div>
 
                         <div>
                           <Label>Artisan Story</Label>
-                          <p className="text-gray-600 italic">{aiListing.story}</p>
+                          <p className="text-muted-foreground italic">{aiListing.story}</p>
                         </div>
                       </div>
                     </div>
@@ -507,7 +509,7 @@ const publishListing = async () => {
                       </Button>
                       <Button
                         onClick={() => setCurrentStep(4)}
-                        className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                        className="bg-madder"
                       >
                         Preview & Publish
                         <ArrowRight className="w-4 h-4 ml-2" />
@@ -521,9 +523,9 @@ const publishListing = async () => {
 
           {/* Step 4: Publish */}
           {currentStep === 4 && aiListing && (
-            <Card className="border-orange-200 shadow-lg">
+            <Card className="border-border shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-600">
+                <CardTitle className="flex items-center gap-2 text-madder">
                   <Check className="w-5 h-5" />
                   Ready to Publish
                 </CardTitle>
@@ -533,7 +535,7 @@ const publishListing = async () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Final Preview */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg p-6">
+                <div className="rounded-lg p-6">
                   <div className="flex items-start gap-4">
                     {images.length > 0 && (
                       <img
@@ -543,19 +545,19 @@ const publishListing = async () => {
                       />
                     )}
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-800 mb-2">{aiListing.title}</h3>
-                      <p className="text-gray-600 mb-3 line-clamp-2">{aiListing.description}</p>
+                      <h3 className="text-xl font-bold text-foreground mb-2">{aiListing.title}</h3>
+                      <p className="text-muted-foreground mb-3 line-clamp-2">{aiListing.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-2xl font-bold text-orange-600">{aiListing.suggestedPrice}</span>
+                        <span className="text-2xl font-bold text-madder">{aiListing.suggestedPrice}</span>
                         <Badge variant="outline">{aiListing.category}</Badge>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-800 mb-2">What happens next?</h4>
-                  <ul className="text-sm text-blue-700 space-y-1">
+                <div className="bg-accent border border-primary/30 rounded-lg p-4">
+                  <h4 className="font-medium text-primary mb-2">What happens next?</h4>
+                  <ul className="text-sm text-primary space-y-1">
                     <li>• Your product will be live on KalaMitra marketplace immediately</li>
                     <li>• Buyers can search and find your product</li>
                     <li>• You'll receive notifications for orders and inquiries</li>
@@ -571,7 +573,7 @@ const publishListing = async () => {
                   <Button
                     size="lg"
                     onClick={publishListing}
-                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                    className="bg-primary"
                   >
                     <Check className="w-5 h-5 mr-2" />
                     Publish to Marketplace

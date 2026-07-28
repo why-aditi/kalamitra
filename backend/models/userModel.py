@@ -3,20 +3,7 @@ from typing import Optional
 from datetime import datetime
 from bson import ObjectId
 
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
-        return ObjectId(v)
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, field_schema):
-        field_schema.update(type="string")
+from models.common import PyObjectId
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -47,18 +34,17 @@ class UserResponse(UserBase):
         
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
     display_name: str
-    role: str = "user"
+    # `role` is NOT a field here on purpose. It used to be client-supplied and
+    # was written straight into a Firebase custom claim, so any registration
+    # could ask for "admin". The server assigns the role (routes/auth.py).
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+    class Config:
+        extra = "ignore"
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: UserResponse
+# NOTE: UserLogin and TokenResponse were removed along with POST /api/login,
+# which minted a token without ever verifying the password.
 
 class UserUpdate(BaseModel):
     display_name: Optional[str] = None

@@ -7,6 +7,8 @@ import { Package, Truck, CheckCircle, Clock, Eye, MessageCircle, Star } from "lu
 import { Badge } from "@/components/ui/badge"
 import { useAuthContext } from "@/components/providers/auth-provider"
 import { api } from "@/lib/api-client" // Assuming this is your API client
+import { orderStatusClass } from "@/lib/order-status"
+import { ProductImage } from "@/components/product-image"
 
 interface Order {
   id: string // Matches backend 'id'
@@ -30,44 +32,35 @@ export default function BuyerOrders() {
   const { user } = useAuthContext() // Get user from auth context
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+
     const fetchOrders = async () => {
-      if (!user?.email) {
-        setLoading(false)
-        console.log("DEBUG_FRONTEND: Current user email:", user?.email)
-        return // Do not fetch if user email is not available
-      }
-
       try {
-        // Assuming your backend has an endpoint like /api/orders that returns buyer-specific orders
-        // and that the response structure is { orders: Order[] }
-        const response = await api.get<{ orders: Order[] }>(`api/orders?email=${user.email}`)
-        console.log("DEBUG_FRONTEND: API response received:", response)
-        console.log("DEBUG_FRONTEND: Orders array from API:", response.orders)
-        setOrders(response.orders || [])
+        /*
+          No `?email=` any more. The endpoint requires auth and reads the buyer
+          from the token — passing an email was both ignored and, before the
+          endpoint was locked down, a way to read anyone's order history.
+        */
+        const response = await api.get<{ orders: Order[] }>("/api/orders")
+        if (!cancelled) setOrders(response.orders || [])
       } catch (error) {
-        console.error("DEBUG_FRONTEND: Error fetching orders:", error)
-        setOrders([]) // Clear orders on error
+        console.error("Failed to load orders:", error)
+        if (!cancelled) setOrders([])
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-    fetchOrders()
-  }, [user?.email]) // Re-fetch when user email changes
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "confirmed":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "shipped":
-        return "bg-purple-100 text-purple-800 border-purple-200"
-      case "delivered":
-        return "bg-green-100 text-green-800 border-green-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+    fetchOrders()
+    return () => {
+      cancelled = true
     }
-  }
+  }, [user])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -86,11 +79,11 @@ export default function BuyerOrders() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <div className="w-16 h-16 bg-madder rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
             <svg
-              className="w-8 h-8 text-white"
+              className="w-8 h-8 text-primary-foreground"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
@@ -105,25 +98,25 @@ export default function BuyerOrders() {
               />
             </svg>
           </div>
-          <p className="text-gray-600">Loading orders...</p>
+          <p className="text-muted-foreground">Loading orders...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 py-10">
+    <div className="min-h-screen py-10">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8">My Orders</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-8">My Orders</h1>
         {orders.length === 0 ? (
-          <Card className="border-orange-200">
+          <Card className="border-border">
             <CardContent className="p-12 text-center">
-              <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">No orders yet</h3>
-              <p className="text-gray-500 mb-6">You haven't placed any orders yet.</p>
+              <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-muted-foreground mb-2">No orders yet</h3>
+              <p className="text-muted-foreground mb-6">You haven't placed any orders yet.</p>
               <Button
                 asChild
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                className="bg-madder"
               >
                 <Link href="/marketplace">Browse Products</Link>
               </Button>
@@ -132,46 +125,40 @@ export default function BuyerOrders() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {orders.map((order) => (
-              <Card key={order.id} className="border-orange-200 hover:shadow-lg transition-shadow">
+              <Card key={order.id} className="border-border hover:shadow-lg transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     {/* Product Image */}
-                    <img
-                      src={order.productImage || "/placeholder.svg"}
-                      alt={order.productTitle}
-                      className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg" // Fallback on error
-                      }}
-                    />
+                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border">
+                      <ProductImage src={order.productImage} alt={order.productTitle} sizes="5rem" />
+                    </div>
                     {/* Order Details */}
                     <div className="flex-1 space-y-2">
-                      <h3 className="font-semibold text-gray-800">{order.productTitle || "Unknown Product"}</h3>
-                      <p className="text-sm text-gray-600">
+                      <h3 className="font-semibold text-foreground">{order.productTitle || "Unknown Product"}</h3>
+                      <p className="text-sm text-muted-foreground">
                         Ordered by {order.buyer} • Quantity: {order.quantity}
                       </p>
                       <div className="flex justify-between items-center">
-                        <p className="text-lg font-bold text-gray-800">{order.amount}</p>
-                        <Badge className={`${getStatusColor(order.status)} border`}>
+                        <p className="text-lg font-bold text-foreground">{order.amount}</p>
+                        <Badge className={`${orderStatusClass(order.status)} border`}>
                           {getStatusIcon(order.status)}
                           <span className="ml-1 capitalize">{order.status}</span>
                         </Badge>
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         Ordered on {new Date(order.date).toLocaleDateString()}
                       </div>
                       {order.status === "delivered" && order.deliveredDate ? (
-                        <div className="text-xs text-green-600">
+                        <div className="text-xs text-neem">
                           Delivered on: {new Date(order.deliveredDate).toLocaleDateString()}
                         </div>
                       ) : order.estimatedDelivery ? (
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-muted-foreground">
                           Expected delivery: {new Date(order.estimatedDelivery).toLocaleDateString()}
                         </div>
                       ) : null}
                       {order.trackingNumber && (
-                        <div className="text-xs text-gray-600">Tracking: {order.trackingNumber}</div>
+                        <div className="text-xs text-muted-foreground">Tracking: {order.trackingNumber}</div>
                       )}
                       {/* Action Buttons */}
                       <div className="flex gap-2 pt-2">

@@ -18,6 +18,10 @@ yarn-error.log*
 
 # env files
 .env*
+# ...but the template is documentation, not a secret, and `.env*` was hiding it.
+# The previously-tracked `env.example` (no dot) was deleted this round, which
+# left the repo with no frontend env documentation at all.
+!.env.example
 
 # vercel
 .vercel

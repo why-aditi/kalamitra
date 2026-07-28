@@ -10,6 +10,8 @@ import Link from "next/link"
 import { useAuthContext } from "@/components/providers/auth-provider"
 import { api } from "@/lib/api-client"
 import { Loader2 } from "lucide-react"
+import { orderStatusClass } from "@/lib/order-status"
+import { ProductImage } from "@/components/product-image"
 
 // Define the interface for an order as seen by an artisan
 interface Order {
@@ -96,21 +98,6 @@ export default function ArtisanOrdersPage() {
     }
   }, [searchQuery, orders])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "confirmed":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "shipped":
-        return "bg-purple-100 text-purple-800 border-purple-200"
-      case "delivered":
-        return "bg-green-100 text-green-800 border-green-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "pending":
@@ -132,34 +119,34 @@ export default function ArtisanOrdersPage() {
 
   if (authLoading || loadingOrders) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          <div className="w-16 h-16 bg-madder rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Loader2 className="w-8 h-8 text-primary-foreground animate-spin" />
           </div>
-          <p className="text-gray-600">Loading your orders...</p>
+          <p className="text-muted-foreground">Loading your orders...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="mb-8 mx-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">My Orders</h1>
-          <p className="text-gray-600">Manage orders of your products</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">My Orders</h1>
+          <p className="text-muted-foreground">Manage orders of your products</p>
         </div>
         {/* Search */}
         <div className="mb-6 mx-8">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               placeholder="Search orders by ID, product, or buyer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 border-orange-200 focus:border-orange-400"
+              className="pl-10 border-border focus:border-ring"
             />
           </div>
         </div>
@@ -175,11 +162,11 @@ export default function ArtisanOrdersPage() {
           {/* All Orders */}
           <TabsContent value="all" className="space-y-4">
             {filteredOrders.length === 0 ? (
-              <Card className="border-orange-200">
+              <Card className="border-border">
                 <CardContent className="p-12 text-center">
-                  <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No orders yet</h3>
-                  <p className="text-gray-500 mb-6">
+                  <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-muted-foreground mb-2">No orders yet</h3>
+                  <p className="text-muted-foreground mb-6">
                     {searchQuery
                       ? "Try adjusting your search terms"
                       : "Customers' orders for your products will appear here"}
@@ -192,42 +179,36 @@ export default function ArtisanOrdersPage() {
             ) : (
               <div className="space-y-4">
                 {filteredOrders.map((order) => (
-                  <Card key={order.id} className="border-orange-200 hover:shadow-lg transition-shadow mx-6">
+                  <Card key={order.id} className="border-border hover:shadow-lg transition-shadow mx-6">
                     <CardContent className="p-6">
                       <div className="flex items-start gap-4">
                         {/* Product Image */}
-                        <img
-                          src={order.productImage || "/placeholder.svg"}
-                          alt={order.productTitle}
-                          className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/placeholder.svg" // Fallback on error
-                          }}
-                        />
+                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border">
+                          <ProductImage src={order.productImage} alt={order.productTitle} sizes="5rem" />
+                        </div>
                         {/* Order Details */}
                         <div className="flex-1 space-y-3">
                           <div className="flex items-start justify-between">
                             <div>
-                              <h3 className="font-semibold text-gray-800 mb-1">{order.productTitle}</h3>
-                              <p className="text-sm text-gray-600">Ordered by {order.buyer}</p>
-                              <p className="text-sm text-gray-500">
+                              <h3 className="font-semibold text-foreground mb-1">{order.productTitle}</h3>
+                              <p className="text-sm text-muted-foreground">Ordered by {order.buyer}</p>
+                              <p className="text-sm text-muted-foreground">
                                 Order ID: {order.id} • Quantity: {order.quantity}
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-lg font-bold text-gray-800">{order.amount}</p>
-                              <Badge className={`${getStatusColor(order.status)} border`}>
+                              <p className="text-lg font-bold text-foreground">{order.amount}</p>
+                              <Badge className={`${orderStatusClass(order.status)} border`}>
                                 {getStatusIcon(order.status)}
                                 <span className="ml-1 capitalize">{order.status}</span>
                               </Badge>
                             </div>
                           </div>
                           {/* Order Timeline */}
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-muted-foreground">
                             <p>Ordered on: {new Date(order.date).toLocaleDateString()}</p>
                             {order.status === "delivered" && order.deliveredDate ? (
-                              <p className="text-green-600">
+                              <p className="text-neem">
                                 Delivered on: {new Date(order.deliveredDate).toLocaleDateString()}
                               </p>
                             ) : (
@@ -265,45 +246,43 @@ export default function ArtisanOrdersPage() {
           {["pending", "confirmed", "shipped", "delivered"].map((status) => (
             <TabsContent key={status} value={status} className="space-y-4">
               {getOrdersByStatus(status).length === 0 ? (
-                <Card className="border-orange-200">
+                <Card className="border-border">
                   <CardContent className="p-12 text-center">
                     {getStatusIcon(status)}
-                    <h3 className="text-xl font-semibold text-gray-600 mb-2 mt-4">No {status} orders</h3>
-                    <p className="text-gray-500">Orders with {status} status will appear here</p>
+                    <h3 className="text-xl font-semibold text-muted-foreground mb-2 mt-4">No {status} orders</h3>
+                    <p className="text-muted-foreground">Orders with {status} status will appear here</p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="space-y-4">
                   {getOrdersByStatus(status).map((order) => (
-                    <Card key={order.id} className="border-orange-200 hover:shadow-lg transition-shadow">
+                    <Card key={order.id} className="border-border hover:shadow-lg transition-shadow">
                       <CardContent className="p-6">
                         <div className="flex items-start gap-4">
-                          <img
-                            src={order.productImage || "/placeholder.svg"}
-                            alt={order.productTitle}
-                            className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                          />
+                          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border">
+                            <ProductImage src={order.productImage} alt={order.productTitle} sizes="5rem" />
+                          </div>
                           <div className="flex-1 space-y-3">
                             <div className="flex items-start justify-between">
                               <div>
-                                <h3 className="font-semibold text-gray-800 mb-1">{order.productTitle}</h3>
-                                <p className="text-sm text-gray-600">Ordered by {order.buyer}</p>
-                                <p className="text-sm text-gray-500">
+                                <h3 className="font-semibold text-foreground mb-1">{order.productTitle}</h3>
+                                <p className="text-sm text-muted-foreground">Ordered by {order.buyer}</p>
+                                <p className="text-sm text-muted-foreground">
                                   Order ID: {order.id} • Quantity: {order.quantity}
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="text-lg font-bold text-gray-800">{order.amount}</p>
-                                <Badge className={`${getStatusColor(order.status)} border`}>
+                                <p className="text-lg font-bold text-foreground">{order.amount}</p>
+                                <Badge className={`${orderStatusClass(order.status)} border`}>
                                   {getStatusIcon(status)}
                                   <span className="ml-1 capitalize">{order.status}</span>
                                 </Badge>
                               </div>
                             </div>
-                            <div className="text-sm text-gray-600">
+                            <div className="text-sm text-muted-foreground">
                               <p>Ordered on: {new Date(order.date).toLocaleDateString()}</p>
                               {order.status === "delivered" && order.deliveredDate ? (
-                                <p className="text-green-600">
+                                <p className="text-neem">
                                   Delivered on: {new Date(order.deliveredDate).toLocaleDateString()}
                                 </p>
                               ) : (

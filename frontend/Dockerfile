@@ -1,61 +1,66 @@
-# Build stage
-FROM node:20-slim as builder
+# syntax=docker/dockerfile:1
+
+# ---------------------------------------------------------------- build stage
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Install pnpm globally
-RUN npm install -g pnpm
+# package-lock.json is the real lockfile here (the 96-byte pnpm-lock.yaml was a
+# stub and has been removed), so install reproducibly with npm ci.
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
+# NEXT_PUBLIC_* values are inlined at build time, so they must be present now.
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_FIREBASE_API_KEY
+ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
+ARG NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+ARG NEXT_PUBLIC_FIREBASE_APP_ID
+ARG NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+# No NEXT_PUBLIC_GEMINI_API_KEY. It was passed through here and inlined into the
+# bundle; the Gemini call now goes to the backend, which holds the key.
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
+    NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY} \
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN} \
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID} \
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET} \
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID} \
+    NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID} \
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=${NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}
 
-# Install dependencies
-RUN pnpm install --no-frozen-lockfile
-
-# Copy source code and environment file
+# No `COPY .env .env`. That baked real secrets into a distributable image layer;
+# .dockerignore now excludes every .env variant so `COPY . .` cannot pick one up.
 COPY . .
-COPY .env .env
 
-# Set build-time environment variables
-ARG NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+RUN npm run build
 
-# Build the application
-RUN pnpm run build
-
-# Production stage
-FROM node:20-slim as production
+# ----------------------------------------------------------- production stage
+FROM node:20-slim AS production
 
 WORKDIR /app
-
-# Install system dependencies for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-# Install pnpm globally
-RUN npm install -g pnpm
-
-# Copy package files
-COPY package.json pnpm-lock.yaml* ./
-
-# Install only production dependencies
-RUN pnpm install --prod --no-frozen-lockfile
-
-# Copy built application from builder stage
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.* ./
-
-# Set runtime environment variables
-ARG NEXT_PUBLIC_API_BASE_URL
-ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV NODE_ENV=production
 
-# Expose the port
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.mjs ./
+
+# node:20-slim ships an unprivileged `node` user; the image ran as root before.
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+# /api/health now exists (app/api/health/route.ts); this check used to always fail.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS http://localhost:3000/api/health || exit 1
 
-# Start the application
-CMD ["pnpm", "start"]
+CMD ["npm", "run", "start"]

@@ -1,3 +1,15 @@
+# Secrets - MUST never enter an image layer.
+# The Dockerfile used to `COPY . .` and then `COPY .env .env`, while this file
+# excluded neither .env nor the Firebase service key: both were baked into the
+# published layers. Secrets are injected at runtime now.
+.env
+.env.*
+!.env.example
+firebaseservicekey.json
+*serviceAccountKey*.json
+*.pem
+*.key
+
 __pycache__
 *.pyc
 *.pyo
@@ -6,13 +18,15 @@ __pycache__
 env
 .venv
 venv/
-.env.local
 .git
+.gitignore
 .DS_Store
 .vscode
 .idea
 *.log
 coverage
 .cache
+.pytest_cache
 dist
 build
+tests

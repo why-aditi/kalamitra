@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!--
+    Same Ajrakh resist diamond as components/wordmark.tsx, cut for favicon sizes.
+    Two changes from the wordmark: the ground is filled indigo rather than paper
+    (a 16px transparent mark disappears against dark browser chrome), and the
+    strokes are ~1.6x heavier because hairlines vanish below 24px.
+    ponytail: literal hex rather than the CSS custom properties, because an SVG
+    served as a static asset has no stylesheet to inherit tokens from. Values
+    mirror app/globals.css: primary 225 38% 29%, background 40 30% 98%, and the
+    dark-mode madder 4 62% 58%, which is the readable one on an indigo ground.
+  -->
+  <rect width="24" height="24" rx="5" fill="#2E3C66"/>
+  <path d="M12 3.2 20.8 12 12 20.8 3.2 12z" fill="none" stroke="#FBFAF8" stroke-opacity="0.6" stroke-width="1.3" stroke-linejoin="round"/>
+  <path d="M12 6.6 17.4 12 12 17.4 6.6 12z" fill="#D65A52"/>
+</svg>

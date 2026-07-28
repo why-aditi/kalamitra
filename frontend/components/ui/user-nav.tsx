@@ -13,6 +13,7 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { navLinksForRole } from "@/lib/nav-links";
 
 export function UserNav() {
   const { user, profile, signOut } = useAuthContext();
@@ -22,34 +23,8 @@ export function UserNav() {
     return null;
   }
 
-  const getRoleBasedLinks = () => {
-    if (!profile) return [];
-
-    switch (profile.role) {
-      case "artisan":
-        return [
-          { href: "/artisan/profile", label: "Profile" },
-          { href: "/artisan/dashboard", label: "Dashboard" },
-          { href: "/artisan/products", label: "My Products" },
-          { href: "/artisan/orders", label: "Orders" },
-        ];
-      case "user":
-        return [
-          { href: "/buyer/profile", label: "Profile" },
-          { href: "/buyer/orders", label: "My Orders" },
-        ];
-      case "admin":
-        return [
-          { href: "/admin/profile", label: "Profile" },
-          { href: "/admin/dashboard", label: "Dashboard" },
-          { href: "/admin/users", label: "Users" },
-          { href: "/admin/products", label: "Products" },
-          { href: "/admin/orders", label: "Orders" },
-        ];
-      default:
-        return [];
-    }
-  };
+  // Drop Marketplace — it is already in the top-level nav next to this menu.
+  const accountLinks = navLinksForRole(profile?.role).filter((l) => l.href !== "/marketplace");
 
   const handleSignOut = async () => {
     try {
@@ -63,10 +38,12 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User avatar"} />
-            <AvatarFallback>{user.displayName?.[0] || "U"}</AvatarFallback>
+        <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0" aria-label="Account menu">
+          <Avatar className="h-9 w-9 border border-border">
+            <AvatarImage src={user.photoURL || ""} alt="" />
+            <AvatarFallback className="bg-secondary text-xs font-semibold text-secondary-foreground">
+              {user.displayName?.[0]?.toUpperCase() || "K"}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
@@ -84,7 +61,7 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          {getRoleBasedLinks().map((link) => (
+          {accountLinks.map((link) => (
             <DropdownMenuItem
               key={link.href}
               className="cursor-pointer"

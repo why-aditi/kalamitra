@@ -129,17 +129,17 @@ const handleSubmit = async (e: React.FormEvent) => {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome to KalaMitra!</h1>
-            <p className="text-gray-600">Let's set up your artisan profile to get started</p>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Welcome to KalaMitra!</h1>
+            <p className="text-muted-foreground">Let's set up your artisan profile to get started</p>
           </div>
 
-          <Card className="border-orange-200 shadow-lg">
+          <Card className="border-border shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-600">
+              <CardTitle className="flex items-center gap-2 text-madder">
                 <User className="w-5 h-5" />
                 Artisan Profile
               </CardTitle>
@@ -151,7 +151,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                     <User className="w-4 h-4" />
                     Basic Information
                   </h3>
@@ -202,7 +202,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
                 {/* Location */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
                     Location
                   </h3>
@@ -241,7 +241,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
                 {/* Preferences */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                     <Languages className="w-4 h-4" />
                     Language Preference
                   </h3>
@@ -268,7 +268,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
                 {/* Bio */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                     <Palette className="w-4 h-4" />
                     About Your Craft
                   </h3>
@@ -292,7 +292,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                    className="flex-1 bg-madder"
                   >
                     {loading ? "Saving..." : "Complete Setup"}
                   </Button>
